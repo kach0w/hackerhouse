@@ -61,6 +61,13 @@ interface SocketApi {
   skipTrack: () => void;
   /** roomIds with a live terminal session (someone's claude/$SHELL pty running right now). */
   activeRooms: Set<string>;
+  /**
+   * Signed session token from join:ok — null until it arrives. Needed to
+   * register a local terminal agent (see local-agent/install.sh); exposed
+   * here so <TerminalAgentOnboard> can build the install command without
+   * the owner having to copy it out of the browser console by hand.
+   */
+  sessionToken: string | null;
 }
 
 const Ctx = createContext<SocketApi | null>(null);
@@ -93,6 +100,7 @@ export function SocketProvider({ children }: { children: ReactNode }) {
   const [connectError, setConnectError] = useState<string | null>(null);
   const [jukebox, setJukebox] = useState<JukeboxState | null>(null);
   const [activeRooms, setActiveRooms] = useState<Set<string>>(new Set());
+  const [sessionToken, setSessionToken] = useState<string | null>(null);
 
   // Mock is opt-in, never a silent fallback.
   const usingMock = new URLSearchParams(window.location.search).get('mock') === '1';
@@ -100,9 +108,10 @@ export function SocketProvider({ children }: { children: ReactNode }) {
 
   // Outbound move throttle: buffer the latest position, flush on an interval.
   const pendingMove = useRef<{ x: number; y: number; facing: Facing } | null>(null);
-  // Signed session token from join:ok — sent back on reconnect, and needed
-  // to launch your own local terminal agent (see server/src/terminal/agent.ts).
-  const sessionToken = useRef<string | null>(null);
+  // Mirrors sessionToken state, read synchronously inside the 'connect'
+  // handler below (a ref, not state, so a reconnect doesn't race a stale
+  // closure over the token — state updates aren't visible until next render).
+  const sessionTokenRef = useRef<string | null>(null);
 
   useEffect(() => {
     const real = usingMock ? null : io(httpBase, { transports: ['websocket'] });
@@ -132,15 +141,8 @@ export function SocketProvider({ children }: { children: ReactNode }) {
       });
     const onJoinOk = (p: { userId: string; token: string }) => {
       if (p.userId !== identity.userId) return;
-      sessionToken.current = p.token;
-      // Only the owner can ever use their own token to run an agent, so
-      // logging it is only actionable by the person it belongs to.
-      console.log(
-        `%c[hackerhouse] to run your own terminal on your own machine:\n\n` +
-          `HACKERHOUSE_SERVER_URL=${httpBase} HACKERHOUSE_USER_ID=${identity.userId} ` +
-          `HACKERHOUSE_SESSION_TOKEN=${p.token} npm run agent --workspace server\n`,
-        'color: #7fe3c0',
-      );
+      sessionTokenRef.current = p.token;
+      setSessionToken(p.token);
     };
 
     socket.on('presence:update', onPresence);
@@ -162,7 +164,7 @@ export function SocketProvider({ children }: { children: ReactNode }) {
         // server resends a fresh snapshot right after this on its own
         // 'connection' handler, so clearing first is safe, not a flicker.
         setActiveRooms(new Set());
-        socket.emit('join', { ...identity, token: sessionToken.current ?? undefined });
+        socket.emit('join', { ...identity, token: sessionTokenRef.current ?? undefined });
       });
       real.on('disconnect', () => setConnected(false));
       real.on('connect_error', (err: Error) => {
@@ -241,6 +243,7 @@ export function SocketProvider({ children }: { children: ReactNode }) {
       jukebox,
       skipTrack,
       activeRooms,
+      sessionToken,
     };
   }, [
     connected,
@@ -260,6 +263,7 @@ export function SocketProvider({ children }: { children: ReactNode }) {
     jukebox,
     skipTrack,
     activeRooms,
+    sessionToken,
   ]);
 
   return <Ctx.Provider value={value}>{children}</Ctx.Provider>;

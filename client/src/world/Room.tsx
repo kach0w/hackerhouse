@@ -14,6 +14,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 
 import { Terminal } from '../components/Terminal';
+import { TerminalAgentOnboard } from '../components/TerminalAgentOnboard';
 import { VoiceControls } from '../components/VoiceControls';
 import { useSocket } from '../hooks/useSocket';
 import { RoomStage, type ScreenRect } from './RoomStage';
@@ -40,7 +41,7 @@ export function Room({
   const hostRef = useRef<HTMLDivElement>(null);
   const sceneRef = useRef<HTMLDivElement>(null);
   const stageRef = useRef<RoomStage | null>(null);
-  const { selfId, users, rooms, setLocked, httpBase, usingMock } = useSocket();
+  const { selfId, users, rooms, setLocked, httpBase, usingMock, sessionToken } = useSocket();
 
   const [screen, setScreen] = useState<ScreenRect | null>(null);
 
@@ -206,6 +207,10 @@ export function Room({
               voiceRoom={`room-${roomId}`}
               serverHttpUrl={httpBase}
             />
+          )}
+
+          {isOwner && !usingMock && (
+            <TerminalAgentOnboard serverUrl={httpBase} roomId={roomId} sessionToken={sessionToken} />
           )}
 
           {isOwner && (

@@ -1,78 +1,86 @@
-// Hacker House local companion — runs on the VISITOR's own machine, never on
-// the shared/ngrok server. Holds one real shell pty, authenticated with
-// whatever the visitor already has on their own PATH (claude, clod alias,
-// open claw, etc.) — this process never touches anyone else's credentials.
+// Hacker House local terminal-agent — runs on the VISITOR's own machine,
+// never on the shared/ngrok host. Spawns a real `claude` pty authenticated
+// with whatever the visitor already has on their own PATH, then registers
+// with the host's Socket.IO /terminal namespace exactly like the manual
+// `npm run agent --workspace server` script used to — the host still relays
+// output to the owner AND any spectators, so nothing about multi-viewer
+// spectating changes. The only thing this replaces is the setup: one curl
+// command instead of cloning the whole monorepo and hand-copying env vars
+// out of the browser console.
 //
-// Bound to 127.0.0.1 only and gated by a token written to disk at install
-// time, so a random website can't attach to your shell just by knowing the
-// port. Runs as a persistent background service (see install.sh) so it
-// survives closing the browser tab and stays available across restarts.
-const http = require("http");
+// Runs as a persistent background service (see install.sh) so it survives
+// closing the browser tab and comes back after a reboot.
 const fs = require("fs");
 const os = require("os");
 const path = require("path");
-const { WebSocketServer } = require("ws");
 const pty = require("node-pty");
-const { Terminal } = require("@xterm/headless");
-const { SerializeAddon } = require("@xterm/addon-serialize");
+const { io } = require("socket.io-client");
 
 const HOME_DIR = path.join(os.homedir(), ".hackerhouse-agent");
-const TOKEN_FILE = path.join(HOME_DIR, "token");
-const PORT = Number(process.env.HACKERHOUSE_AGENT_PORT) || 47821;
-const SCROLLBACK = 1000;
-const COLS = 100;
-const ROWS = 30;
+const CONFIG_FILE = path.join(HOME_DIR, "config.json");
+const HOOK_FILE = path.join(HOME_DIR, "notify-agent-done.sh");
 
-function readToken() {
+function readConfig() {
   try {
-    return fs.readFileSync(TOKEN_FILE, "utf8").trim();
+    return JSON.parse(fs.readFileSync(CONFIG_FILE, "utf8"));
   } catch {
-    console.error(`No token found at ${TOKEN_FILE}. Run install.sh first.`);
+    console.error(`No config found at ${CONFIG_FILE}. Run install.sh first.`);
     process.exit(1);
   }
 }
 
-const TOKEN = readToken();
+const { serverUrl, roomId, token } = readConfig();
+if (!serverUrl || !roomId || !token) {
+  console.error(`${CONFIG_FILE} is missing serverUrl/roomId/token. Re-run install.sh.`);
+  process.exit(1);
+}
 
-// One persistent pty for the whole machine — this agent is "your terminal",
-// singular, not a multi-room server. It's created lazily on first verified
-// connection and kept alive across reconnects/browser reloads so scrollback
-// and any running foreground process (including Claude Code) survive a
-// lounge-and-back trip.
-let session = null;
+// Same convention as the host's own resolveCwd (server/src/terminal/pty.ts):
+// a room-scoped dir under ~/demo/<roomId> so a project-local Claude Stop
+// hook can be installed without touching the visitor's own ~/.claude/.
+function resolveCwd() {
+  const dir = path.join(os.homedir(), "demo", roomId);
+  fs.mkdirSync(dir, { recursive: true });
+  return dir;
+}
 
-function createSession() {
-  const shell = process.platform === "win32" ? "powershell.exe" : process.env.SHELL || "/bin/bash";
-  const term = pty.spawn(shell, [], {
-    name: "xterm-color",
-    cols: COLS,
-    rows: ROWS,
-    cwd: os.homedir(),
-    env: process.env,
-  });
+// Mirrors the host's ensureNotifyHook, using the copy of the hook script
+// install.sh fetched from the same server this agent is registering with
+// (there's no repo checkout on the visitor's machine to read it from).
+function ensureNotifyHook(cwd) {
+  if (!fs.existsSync(HOOK_FILE)) {
+    console.warn(`[agent] notify hook missing at ${HOOK_FILE} — agent-done will not fire`);
+    return;
+  }
+  try {
+    const hooksDir = path.join(cwd, ".claude", "hooks");
+    fs.mkdirSync(hooksDir, { recursive: true });
 
-  const screen = new Terminal({ cols: COLS, rows: ROWS, scrollback: SCROLLBACK, allowProposedApi: true });
-  const serializer = new SerializeAddon();
-  screen.loadAddon(serializer);
+    const hookDest = path.join(hooksDir, "notify-agent-done.sh");
+    fs.copyFileSync(HOOK_FILE, hookDest);
+    fs.chmodSync(hookDest, 0o755);
 
-  const s = { pty: term, screen, serializer, sockets: new Set() };
-
-  term.onData((data) => {
-    screen.write(data);
-    for (const ws of s.sockets) {
-      if (ws.readyState === ws.OPEN) ws.send(JSON.stringify({ type: "output", data }));
+    const settingsPath = path.join(cwd, ".claude", "settings.json");
+    let settings = {};
+    if (fs.existsSync(settingsPath)) {
+      try {
+        settings = JSON.parse(fs.readFileSync(settingsPath, "utf8"));
+      } catch {
+        settings = {};
+      }
     }
-  });
 
-  term.onExit(() => {
-    for (const ws of s.sockets) {
-      if (ws.readyState === ws.OPEN) ws.send(JSON.stringify({ type: "exited" }));
-    }
-    screen.dispose();
-    if (session === s) session = null;
-  });
+    const escaped = hookDest.replace(/'/g, `'\\''`);
+    const prevHooks = settings.hooks && typeof settings.hooks === "object" ? settings.hooks : {};
+    settings.hooks = {
+      ...prevHooks,
+      Stop: [{ hooks: [{ type: "command", command: `bash '${escaped}'` }] }],
+    };
 
-  return s;
+    fs.writeFileSync(settingsPath, `${JSON.stringify(settings, null, 2)}\n`);
+  } catch (err) {
+    console.warn("[agent] failed to install notify Stop hook:", err.message);
+  }
 }
 
 function clamp(value, min, max) {
@@ -81,69 +89,66 @@ function clamp(value, min, max) {
   return Math.min(max, Math.max(min, n));
 }
 
-const server = http.createServer((req, res) => {
-  // Plain health check so the frontend can poll for "is the agent up yet"
-  // without opening a WS handshake every time.
-  if (req.url === "/health") {
-    res.writeHead(200, { "content-type": "application/json" });
-    res.end(JSON.stringify({ ok: true }));
-    return;
+let ptyProcess = null;
+
+function startPty() {
+  if (ptyProcess) return;
+  const cwd = resolveCwd();
+  ensureNotifyHook(cwd);
+
+  const opts = {
+    name: "xterm-color",
+    cols: 100,
+    rows: 30,
+    cwd,
+    env: {
+      ...process.env,
+      HACKERHOUSE_SERVER_URL: serverUrl,
+      HACKERHOUSE_USER_ID: roomId,
+    },
+  };
+
+  try {
+    ptyProcess = pty.spawn("claude", [], opts);
+  } catch (err) {
+    console.warn(`[agent] "claude" not found on PATH, falling back to $SHELL:`, err.message);
+    ptyProcess = pty.spawn(process.env.SHELL || "bash", [], opts);
   }
-  res.writeHead(404);
-  res.end();
+
+  ptyProcess.onData((data) => {
+    socket.emit("localAgent:output", { roomId, data });
+  });
+  ptyProcess.onExit(({ exitCode }) => {
+    console.log(`[agent] claude exited (code ${exitCode}) — exiting so the service restarts a fresh session.`);
+    process.exit(0);
+  });
+}
+
+const socket = io(`${serverUrl}/terminal`, { transports: ["websocket"] });
+
+socket.on("connect", () => {
+  console.log(`[agent] connected, registering room ${roomId}...`);
+  socket.emit("localAgent:register", { roomId, token });
 });
 
-// Bind explicitly to the loopback interface — never 0.0.0.0 — so this is
-// unreachable from anything but the visitor's own machine.
-const wss = new WebSocketServer({ server, host: "127.0.0.1" });
-
-wss.on("connection", (ws) => {
-  let authed = false;
-
-  ws.on("message", (raw) => {
-    let msg;
-    try {
-      msg = JSON.parse(raw);
-    } catch {
-      return;
-    }
-
-    if (!authed) {
-      if (msg.type === "hello" && msg.token === TOKEN) {
-        authed = true;
-        if (!session) session = createSession();
-        session.sockets.add(ws);
-        ws.send(
-          JSON.stringify({
-            type: "ready",
-            buffer: session.serializer.serialize({ scrollback: SCROLLBACK }),
-          })
-        );
-      } else {
-        ws.close();
-      }
-      return;
-    }
-
-    if (msg.type === "input") {
-      session.pty.write(msg.data);
-      return;
-    }
-
-    if (msg.type === "resize") {
-      const cols = clamp(msg.cols, 10, 300);
-      const rows = clamp(msg.rows, 5, 100);
-      session.pty.resize(cols, rows);
-      session.screen.resize(cols, rows);
-      return;
-    }
-  });
-
-  ws.on("close", () => {
-    if (session) session.sockets.delete(ws);
-  });
+socket.on("localAgent:registered", () => {
+  console.log(`[agent] registered — this room's terminal now runs here, on this machine.`);
+  startPty();
 });
 
-server.listen(PORT, "127.0.0.1", () => {
-  console.log(`hacker house local agent listening on ws://127.0.0.1:${PORT}`);
+socket.on("localAgent:register:denied", ({ reason }) => {
+  console.error(`[agent] registration denied: ${reason}`);
+  process.exit(1);
+});
+
+socket.on("localAgent:input", ({ data }) => {
+  ptyProcess?.write(data);
+});
+
+socket.on("localAgent:resize", ({ cols, rows }) => {
+  ptyProcess?.resize(clamp(cols, 10, 300), clamp(rows, 5, 100));
+});
+
+socket.on("connect_error", (err) => {
+  console.error("[agent] connect_error:", err.message);
 });

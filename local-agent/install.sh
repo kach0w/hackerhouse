@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Hacker House local terminal — one-time install.
-# Usage: curl -fsSL $ORIGIN/agent/install.sh | bash -s -- $TOKEN $ORIGIN
+# Usage: curl -fsSL $SERVER_URL/agent/install.sh | bash -s -- $SERVER_URL $ROOM_ID $TOKEN
 #
 # Downloads the local companion, installs its deps, and registers it as an
 # autostarting background service so it comes back after a reboot without
@@ -8,8 +8,9 @@
 # flow — everything after this is automatic.
 set -euo pipefail
 
-TOKEN="${1:?token required (pass the value shown by the app)}"
-ORIGIN="${2:?origin required (pass the app URL)}"
+SERVER_URL="${1:?server URL required (pass the app URL)}"
+ROOM_ID="${2:?room id required (pass your userId, shown by the app)}"
+TOKEN="${3:?session token required (pass the value shown by the app)}"
 AGENT_DIR="$HOME/.hackerhouse-agent"
 
 if ! command -v node >/dev/null 2>&1; then
@@ -19,10 +20,23 @@ if ! command -v node >/dev/null 2>&1; then
 fi
 
 mkdir -p "$AGENT_DIR"
-curl -fsSL "$ORIGIN/agent/agent.js" -o "$AGENT_DIR/agent.js"
-curl -fsSL "$ORIGIN/agent/package.json" -o "$AGENT_DIR/package.json"
-printf '%s' "$TOKEN" > "$AGENT_DIR/token"
-chmod 600 "$AGENT_DIR/token"
+curl -fsSL "$SERVER_URL/agent/agent.js" -o "$AGENT_DIR/agent.js"
+curl -fsSL "$SERVER_URL/agent/package.json" -o "$AGENT_DIR/package.json"
+# Same Stop hook the host installs for a host-spawned pty (terminal/pty.ts)
+# — fetched rather than bundled so there's one source of truth for it.
+curl -fsSL "$SERVER_URL/agent/hooks/notify-agent-done.sh" -o "$AGENT_DIR/notify-agent-done.sh"
+
+# Room id and session token are per-visitor secrets scoped to one room;
+# serverUrl is not, but keeping all three together in one file matches what
+# agent.js actually needs to register and is simplest to autostart with.
+cat > "$AGENT_DIR/config.json" <<EOF
+{
+  "serverUrl": "$SERVER_URL",
+  "roomId": "$ROOM_ID",
+  "token": "$TOKEN"
+}
+EOF
+chmod 600 "$AGENT_DIR/config.json"
 
 echo "Installing dependencies (first time only, ~30-60s)..."
 (cd "$AGENT_DIR" && npm install --omit=dev --silent)
@@ -40,7 +54,7 @@ if ! "$NODE_BIN" -e "require('node-pty')" >/dev/null 2>&1; then
   echo "This usually means Python and a C++ toolchain aren't installed:" >&2
   echo "  macOS:  xcode-select --install" >&2
   echo "  Linux:  install Python 3 + gcc/make (e.g. build-essential on Debian/Ubuntu)" >&2
-  echo "Then re-run: curl -fsSL \$ORIGIN/agent/install.sh | bash -s -- \$TOKEN \$ORIGIN" >&2
+  echo "Then re-run: curl -fsSL \$SERVER_URL/agent/install.sh | bash -s -- \$SERVER_URL \$ROOM_ID \$TOKEN" >&2
   exit 1
 fi
 
