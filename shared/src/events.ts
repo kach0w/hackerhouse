@@ -1,9 +1,9 @@
-import { User, RoomState } from './types';
+import type { User, RoomState, Facing } from './types';
 
 // ---- Client -> Server (main namespace) ----
 export interface ClientToServerEvents {
   join: (payload: { userId: string; name: string }) => void;
-  move: (payload: { x: number; y: number; facing: 'up' | 'down' | 'left' | 'right' }) => void;
+  move: (payload: { x: number; y: number; facing: Facing }) => void;
   'room:enter': (payload: { roomId: string }) => void;
   'room:leave': (payload: { roomId: string }) => void;
   'room:lock': (payload: { locked: boolean }) => void; // only affects your own room
@@ -32,4 +32,4 @@ export interface TerminalServerToClient {
 // POST /notify        body: { userId: string }              — from the Claude Code Stop hook
 // POST /voice/token    body: { identity: string; room: string } -> { token: string }
 
-export { User, RoomState };
+export type { User, RoomState, Facing };

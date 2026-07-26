@@ -53,9 +53,45 @@ LiveKit room names D will use:
 
 ## Builder A — State server & contract
 
-- **Last update:** 2026-07-26T05:40Z
-- **Status:** done — spine is live and verified.
+- **Last update:** 2026-07-26T06:05Z
+- **Status:** done — spine live, verified, and just hardened after a self-review.
 - **Goals now:** available to help unblock B/C/D; will keep polling this file.
+- **Self-review findings + fixes (ran /code-review medium on the shared+server
+  diff, all in files I own, no other builder's directories touched):**
+  - **FIXED — reconnect race:** `disconnect` was deleting the user from
+    presence unconditionally. A browser refresh (old socket's disconnect
+    processed after the new socket's join) could wipe a live reconnected
+    user. Now tracks `activeSockets: Map<userId, socketId>`; a stale socket's
+    disconnect is a no-op if a newer socket already re-registered that userId.
+  - **FIXED — ghost occupants:** `room:enter` never removed a user from the
+    room they were previously visiting before adding them to a new one.
+    Jumping room→room without an intervening `room:leave` left permanent
+    ghost occupants. Extracted a `leaveCurrentRoom` helper, used by both
+    `room:enter` and `room:leave`.
+  - **FIXED — build-breaking contract bug:** `shared/src/events.ts` re-exported
+    `User`/`RoomState` as values instead of `export type`. Confirmed via
+    `tsc --isolatedModules` this is a hard compile error — and Vite's default
+    tsconfig sets `isolatedModules: true`, so **this would have broken
+    Builder B's build the moment they scaffolded Vite and imported from
+    shared/**. Now `import type`/`export type` throughout events.ts.
+  - **FIXED — dropped `facing` field:** the `move` event contract declared
+    `facing` but the handler dropped it and `User` had no field for it, so
+    avatar direction could never reach other clients. Added `Facing` type to
+    shared/src/types.ts, `User.facing`, threaded through join/move — **B: your
+    avatars can now render facing direction from `presence:update`, it
+    wasn't reaching you before.**
+  - **FIXED — broken script:** root `build:shared` referenced a nonexistent
+    script; added `"build": "tsc --noEmit"` to shared/package.json.
+  - **NOTED, not fixed (flagging for C):** `join` trusts the client-supplied
+    `userId` with zero auth — any socket can claim any userId today, which
+    only matters for room:lock griefing right now but is the same trust gap
+    ENGINEERING_PLAN.md calls out as the real risk for terminal owner/visitor
+    enforcement. Didn't build auth solo since C's terminal handshake needs to
+    agree on the same mechanism — **C: let's design this together when you
+    start the port, not two independent half-solutions.**
+  - Added 2 new regression tests to `server/src/state/verify.ts` covering the
+    reconnect race and ghost-occupant fixes. All 9 checks pass, `tsc --noEmit`
+    clean in both `shared/` and `server/`.
 - **Done:**
   - Monorepo scaffold: root `package.json` (npm workspaces: `shared`,
     `server`, `client`), root `.gitignore` (`node_modules/`, `dist/`, `.env`
@@ -217,31 +253,30 @@ LiveKit room names D will use:
 
 ## Builder D — Voice + agent-done  ← THIS AGENT
 
-- **Last update:** 2026-07-26T05:28Z
-- **Status:** server path green. A mounted routers + `getUserState` /
-  `emitAgentDone`. Smoke-tested locally. Still need LiveKit Cloud creds +
-  B's Vite/client pins before end-to-end voice UI.
+- **Last update:** 2026-07-26T05:53Z
+- **Status:** **Builder D server side fully done + verified with real LiveKit
+  creds.** Only remaining dependency is B's client scaffold.
 - **Goals now:**
-  1. Keep polling for B Vite scaffold + client LiveKit pins.
-  2. Once `server/.env` has LiveKit keys locally, re-test `/voice/token`
-     returns a JWT (will not commit `.env`).
-  3. Stay out of A/B/C directories unless asked.
+  1. Poll for B's Vite scaffold; browser-test `VoiceControls` once it exists.
+  2. Nothing else outstanding on D's side.
 - **Done:**
   - Crosstalk + settled LiveKit dep pins (server pins applied by A ✓).
-  - `server/src/voice/routes.ts` — `createVoiceRouter()` → `POST /voice/token`
-    returns `{ token, url }` (503 until LiveKit env is set — expected).
-  - `server/src/notify/routes.ts` — factory wired by A in `index.ts`.
-  - `client/src/components/VoiceControls.tsx` — props API ready for B.
+  - `server/src/voice/routes.ts` — `POST /voice/token` **verified minting
+    real JWTs** for `lounge` and `room-<userId>` (creds live in local
+    `server/.env`, gitignored; whoever hosts the server needs them — DM D).
+  - Room lifecycle note: LiveKit Cloud auto-creates a voice room on first
+    join and auto-destroys it when empty — no provisioning/cleanup code
+    needed server-side.
+  - `server/src/notify/routes.ts` — wired by A; verified: lounge user →
+    `agent:done` broadcast; in-room/offline → no-op.
+  - `client/src/components/VoiceControls.tsx` — props API ready for B
+    (**written, not yet browser-tested** — no client app exists).
   - `.claude/hooks/notify-agent-done.sh` + `.claude/settings.json` Stop hook.
-  - Smoke: `/health` ok; `/voice/token` validates body + missing creds;
-    `/notify` unknown→no-op, lounge user→`agent:done` broadcast,
-    in-room user→no-op.
 - **Blocked on:**
   - B: Vite scaffold + client LiveKit pins + mount `<VoiceControls />`
-  - LiveKit Cloud creds in local `server/.env` (never commit)
+    (this is the only thing between us and audible end-to-end voice).
 - **Requests to others:**
   - **To B:** still need client pins + mount (see Incoming under B).
-  - **To A:** wiring confirmed — thanks. No further asks.
 - **Incoming requests:** _(none)_
 
 ### Builder D — settled dependency pins (do not freestyle)
