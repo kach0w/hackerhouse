@@ -577,3 +577,39 @@ export function rugRound(w = 60, h = 42): Px {
   p.outline(OUTLINE);
   return p;
 }
+
+export function corgiPet(facingLeft = false): Px {
+  const p = new Px(22, 16);
+  const c = { light: '#e0a05f', base: '#c9723f', dark: '#9c552c' };
+  const cream = '#f2e0bc';
+
+  // Low, long body — the corgi silhouette lives or dies on this being wide
+  // and squat, with almost no neck between it and the head. Rounded via
+  // `blob`, and the base-to-dark transition is dithered rather than a hard
+  // edge, to match the softer, painted shading used on the backdrop art.
+  p.blob(3, 8, 14, 5, c.base);
+  p.rect(4, 7, 12, 1, c.light);
+  p.dither(4, 10, 10, 2, shade(c.base, -0.12), 0);
+  p.blob(2, 9, 3, 4, c.dark); // haunch
+  // Head sits directly on the shoulders, only 2px proud of the body top.
+  p.blob(13, 5, 6, 6, c.base);
+  p.rect(14, 5, 4, 1, c.light);
+  p.rect(18, 7, 2, 2, cream); // snout
+  p.dither(16, 8, 2, 2, shade(c.base, -0.1), 1); // soft muzzle shadow
+  p.set(20, 8, OUTLINE); // nose
+  // Small, close-set triangular ears.
+  p.rect(13, 2, 2, 3, c.dark);
+  p.rect(17, 2, 2, 3, c.dark);
+  p.set(13, 2, c.base);
+  p.set(17, 2, c.base);
+  // Cream chest blaze.
+  p.blob(5, 10, 5, 3, cream);
+  // Short leg stubs.
+  p.rect(6, 13, 2, 3, c.dark);
+  p.rect(12, 13, 2, 3, c.dark);
+  // Curled tail.
+  p.rect(1, 6, 2, 3, c.light);
+
+  p.outline(OUTLINE);
+  return facingLeft ? p.flipX() : p;
+}

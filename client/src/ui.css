@@ -139,7 +139,7 @@ body {
 }
 
 .hud-left {
-  top: 78px;
+  top: 100px;
   left: 20px;
   display: flex;
   flex-direction: column;

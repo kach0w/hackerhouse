@@ -69,72 +69,104 @@ export function facingFromDelta(dx: number, dy: number): 'up' | 'down' | 'left' 
   return dy > 0 ? 'down' : 'up';
 }
 
+/**
+ * Rough floor-blocking footprint of the furniture baked into the lounge
+ * backdrop image, in native px. Hand-eyeballed against the art (not derived
+ * from any layout data — the backdrop is a single flat image, so there's no
+ * other source of truth for where things are). Deliberately coarse: one box
+ * per cluster, not a per-object hitbox.
+ */
+export interface Obstacle {
+  x: number;
+  y: number;
+  w: number;
+  h: number;
+}
+
+export const LOUNGE_OBSTACLES: Obstacle[] = [
+  { x: 0, y: 55, w: 40, h: 70 }, // arcade cabinet
+  { x: 70, y: 80, w: 95, h: 45 }, // ping pong table
+  { x: 55, y: 130, w: 85, h: 50 }, // pool table
+  { x: 165, y: 60, w: 55, h: 35 }, // bookshelf
+  { x: 190, y: 135, w: 115, h: 75 }, // centre co-working table + rug
+  { x: 275, y: 55, w: 195, h: 75 }, // kitchen counter + fridge
+  { x: 360, y: 115, w: 115, h: 100 }, // fireplace + ottomans
+  { x: 50, y: 180, w: 80, h: 40 }, // maker desk — printer/bins
+  { x: 0, y: 210, w: 130, h: 100 }, // maker desk — workbench
+  { x: 310, y: 205, w: 55, h: 85 }, // armchair
+  { x: 355, y: 205, w: 130, h: 100 }, // sectional + side tables
+];
+
+/** Roughly an avatar's half-width — keeps feet off the furniture edge, not just its footprint. */
+const OBSTACLE_PAD = 6;
+
+/**
+ * If (x, y) sits inside a padded obstacle, push it out to the nearest edge.
+ * Deliberately simple — first hit wins, no sliding along multiple edges —
+ * which is fine since the obstacle boxes above don't overlap.
+ */
+export function resolveObstacles(
+  x: number,
+  y: number,
+  pad = OBSTACLE_PAD,
+): { x: number; y: number; blocked: boolean } {
+  for (const o of LOUNGE_OBSTACLES) {
+    const left = o.x - pad;
+    const right = o.x + o.w + pad;
+    const top = o.y - pad;
+    const bottom = o.y + o.h + pad;
+    if (x <= left || x >= right || y <= top || y >= bottom) continue;
+
+    const distLeft = x - left;
+    const distRight = right - x;
+    const distTop = y - top;
+    const distBottom = bottom - y;
+    const min = Math.min(distLeft, distRight, distTop, distBottom);
+
+    if (min === distLeft) x = left;
+    else if (min === distRight) x = right;
+    else if (min === distTop) y = top;
+    else y = bottom;
+
+    return { x, y, blocked: true };
+  }
+  return { x, y, blocked: false };
+}
+
 // --- Room scene geometry -----------------------------------------------------
 
 /**
- * The room fills the whole viewport: your avatar sits at a desk with a large
- * monitor, and the real terminal is positioned exactly over that monitor's
- * glass — so the agent runs on the machine your character is using, rather
- * than in a panel bolted above the scene.
+ * The room is a single illustrated background image now (see
+ * RoomStage.drawBackdrop) — walls, desk, monitor, bed, bookshelf, everything
+ * lives in the art file. It's stretched to fill this footprint and shown in
+ * full (contain-fit, letterboxed if the viewport's aspect ratio doesn't
+ * match), not cropped/zoomed the way the old tile-drawn room was — the whole
+ * thing is a composed illustration meant to be seen as a whole.
  *
- * It's a large tilemap the camera sits *inside*, not a fixed picture scaled to
- * fit. Letterboxing a fixed room meant a tall window showed a small rectangle
- * floating in black; this way floor and walls run to every edge at a clean
- * integer zoom.
+ * Source art is 1280x832; this is scaled down 0.8x to keep native-pixel
+ * coordinates in a similar range to the rest of the app.
  */
 export const ROOM_PX_W = 1024;
 export const ROOM_PX_H = 640;
 
-/** Everything above this line is wall, everything below is floor. */
-export const ROOM_FLOOR_TOP = 256;
-export const ROOM_WALL_ROWS = ROOM_FLOOR_TOP / TILE;
-
-/** The desk composition is centred on this column. */
-export const ROOM_CX = 512;
-
 /**
- * Camera target: the midpoint of the composition (monitor top ~87 down to the
- * chair ~352), so the whole desk setup stays framed rather than clipping the
- * top of the bezel.
+ * Monitor glass, in the same ROOM_PX_W x ROOM_PX_H space — the terminal is
+ * overlaid here in CSS pixels. Measured from the art file (source image
+ * region x=420,y=145,w=350,h=205 at 1280x832, scaled by 0.8/0.7692). Re-measure
+ * if the art file ever changes.
  */
-export const ROOM_FOCUS = { x: ROOM_CX, y: 220 };
+export const MONITOR_SCREEN = { x: 336, y: 112, w: 280, h: 158 };
 
-/**
- * The area the camera guarantees is visible — and therefore what sets the zoom.
- *
- * ⚠️ These are load-bearing, not slack. Zoom is `floor(min(w/VIEW_W, h/VIEW_H))`,
- * so nudging either value up can cross an integer threshold and drop the zoom a
- * whole step, which makes everything *smaller* on screen even as it grows in
- * native pixels. That already happened once: VIEW_H 300 → 320 took a 1440x900
- * window from 3x to 2x and shrank the monitor from 564px to 470px of glass.
- *
- * Keep these just above the composition's real extent (≈340 x ≈265) and change
- * them only while watching the resulting glass width.
- */
-export const ROOM_VIEW_W = 360;
-export const ROOM_VIEW_H = 275;
+/** Where the room owner sits — in the chair, facing the monitor. */
+export const DESK = { x: 508, y: 415 };
 
-/** Monitor bezel footprint, native px. */
-export const MONITOR = { x: ROOM_CX - 130, y: 87, w: 260, h: 165 };
+/** Where an arriving avatar starts, roughly at the door in the art. */
+export const ROOM_DOOR = { x: 64, y: 462 };
 
-/**
- * The glass — the terminal is overlaid here in CSS pixels. Keep this in sync
- * with `monitorFrame()` in art/props.ts: the sprite draws the bezel around this
- * rect and leaves the interior empty so the DOM terminal shows through.
- */
-export const MONITOR_SCREEN = { x: ROOM_CX - 117, y: 100, w: 235, h: 130 };
-
-/** Desk slab under the monitor. */
-export const DESK_TOP = { x: ROOM_CX - 150, y: 252, w: 300, h: 34 };
-
-/** Where the room owner sits — in front of the desk, back to the viewer. */
-export const DESK = { x: ROOM_CX, y: 332 };
-export const ROOM_DOOR = { x: ROOM_CX - 212, y: 300 };
-
-/** Where visiting avatars stand once they've walked in — right by the chair. */
+/** Where visiting avatars stand once they've walked in — open floor either side. */
 export const VISITOR_SLOTS = [
-  { x: ROOM_CX + 68, y: 328 },
-  { x: ROOM_CX + 92, y: 344 },
-  { x: ROOM_CX - 68, y: 328 },
-  { x: ROOM_CX - 92, y: 344 },
+  { x: 220, y: 500 },
+  { x: 800, y: 500 },
+  { x: 260, y: 470 },
+  { x: 760, y: 470 },
 ];
