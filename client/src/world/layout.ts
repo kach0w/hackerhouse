@@ -151,27 +151,30 @@ export const ROOM_PX_H = 640;
 
 /**
  * Monitor glass, in the same ROOM_PX_W x ROOM_PX_H space — the terminal is
- * overlaid here in CSS pixels. Widened/heightened to the full screen area
- * (the entire dark bezel interior, not just the sub-region with the little
- * face-avatar decoration in the art) so the real terminal fills the whole
- * monitor rather than a smaller inset. Measured from the art file (source
- * image region x=408,y=132,w=460,h=230 at 1280x832, scaled by 0.8/0.7692).
- * Re-measure if the art file ever changes.
+ * overlaid here in CSS pixels. Measured programmatically: scanned the source
+ * art file pixel-by-pixel for the dark terminal-background rectangle plus
+ * the lighter blue profile-icon panel beside it (both part of the same
+ * screen glass, not separate decor) versus the warm wood/bezel tones around
+ * them. Edges at source x=399-870, y=124-393 (of 1280x832), scaled by
+ * 0.8/0.7692. Re-measure the same way if the art file ever changes.
  */
-export const MONITOR_SCREEN = { x: 326, y: 102, w: 368, h: 220 };
+export const MONITOR_SCREEN = { x: 319, y: 95, w: 377, h: 207 };
 
 /** Where the room owner sits — in the chair, facing the monitor. */
-export const DESK = { x: 508, y: 500 };
+export const DESK = { x: 508, y: 445 };
 
 /** Where an arriving avatar starts, roughly at the door in the art. */
 export const ROOM_DOOR = { x: 64, y: 462 };
 
-/** Where visiting avatars stand once they've walked in — open floor either side. */
+/**
+ * Where visiting avatars stand — well clear to the left of the owner's
+ * chair, not crowding the desk.
+ */
 export const VISITOR_SLOTS = [
-  { x: 220, y: 560 },
-  { x: 800, y: 560 },
-  { x: 260, y: 530 },
-  { x: 760, y: 530 },
+  { x: 130, y: 505 },
+  { x: 850, y: 505 },
+  { x: 170, y: 475 },
+  { x: 810, y: 475 },
 ];
 
 /**

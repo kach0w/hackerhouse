@@ -156,12 +156,24 @@ export function Room({
     <div className={`scene room-scene${expanded ? ' is-expanded' : ''}`} ref={sceneRef}>
       <div className="canvas-host" ref={hostRef} />
 
-      {!expanded && (
-        <div className="hud hud-topleft">
-          <div className="hud-title">THE ROOM</div>
-          <div className="hud-sub">
-            {isOwner ? 'your desk' : `${owner?.name ?? roomId}'s desk`}
-          </div>
+      <div className={`hud hud-topleft${expanded ? ' hud-hidden' : ''}`}>
+        <div className="hud-title">THE ROOM</div>
+        <div className="hud-sub">
+          {isOwner ? 'your desk' : `${owner?.name ?? roomId}'s desk`}
+        </div>
+      </div>
+
+      {/* Always mounted — the fullscreen toggle only hides this visually
+          (via CSS on the hud-hidden class). Unmounting it here would kill
+          and reconnect the LiveKit session on every toggle, causing the
+          mute button to flicker/reset each time. */}
+      {!usingMock && (
+        <div className={`hud hud-topright${expanded ? ' hud-hidden' : ''}`}>
+          <VoiceControls
+            identity={selfId}
+            voiceRoom={`room-${roomId}`}
+            serverHttpUrl={httpBase}
+          />
         </div>
       )}
 
@@ -212,14 +224,6 @@ export function Room({
         </div>
 
         <div className="room-bar-right">
-          {!usingMock && (
-            <VoiceControls
-              identity={selfId}
-              voiceRoom={`room-${roomId}`}
-              serverHttpUrl={httpBase}
-            />
-          )}
-
           {isOwner && (
             <button
               className={`btn btn-icon${room?.locked ? ' is-on' : ''}`}

@@ -53,26 +53,37 @@ body {
 
 /* --- Buttons --------------------------------------------------------------- */
 
+/* Pixel/retro-game button: sharp corners, a hard bevel (light top-left,
+   dark bottom-right) instead of a soft border, and a flat drop shadow with
+   no blur — reads as a chunky physical button, matching the rest of the
+   pixel-art scene instead of a smooth modern flat-UI button. */
 .btn {
   font-family: var(--mono);
-  font-size: 12px;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.4px;
+  text-transform: uppercase;
   color: var(--text);
-  background: rgba(40, 46, 60, 0.9);
-  border: 1px solid var(--edge);
-  border-radius: 6px;
+  background: #2a2f3d;
+  border: none;
+  border-radius: 0;
   padding: 8px 14px;
   cursor: pointer;
-  transition:
-    background 120ms ease,
-    transform 80ms ease;
+  box-shadow:
+    inset 2px 2px 0 rgba(255, 255, 255, 0.1),
+    inset -2px -2px 0 rgba(0, 0, 0, 0.4),
+    3px 3px 0 rgba(0, 0, 0, 0.35);
 }
 
 .btn:hover:not(:disabled) {
-  background: rgba(58, 66, 84, 0.95);
+  background: #363c4d;
 }
 
 .btn:active:not(:disabled) {
-  transform: translateY(1px);
+  box-shadow:
+    inset -2px -2px 0 rgba(255, 255, 255, 0.1),
+    inset 2px 2px 0 rgba(0, 0, 0, 0.4);
+  transform: translate(2px, 2px);
 }
 
 .btn:disabled {
@@ -82,9 +93,7 @@ body {
 
 .btn-primary {
   background: var(--accent);
-  border-color: #b45f43;
   color: #fff;
-  font-weight: 600;
 }
 
 .btn-primary:hover:not(:disabled) {
@@ -95,11 +104,12 @@ body {
   padding: 7px 10px;
   font-size: 14px;
   line-height: 1;
+  text-transform: none;
+  letter-spacing: 0;
 }
 
 .btn-icon.is-on {
-  background: rgba(217, 119, 87, 0.25);
-  border-color: var(--accent);
+  background: rgba(217, 119, 87, 0.35);
 }
 
 /* --- HUD ------------------------------------------------------------------- */
@@ -112,6 +122,12 @@ body {
 
 .hud > * {
   pointer-events: auto;
+}
+
+/* Visually hidden without unmounting — some HUD elements (VoiceControls)
+   hold live connection state that a conditional-render unmount would kill. */
+.hud-hidden {
+  display: none;
 }
 
 .hud-topleft {
@@ -775,9 +791,11 @@ body {
 }
 
 /* In the room the bottom-left corner belongs to the room bar. */
+/* Bottom-left, same corner as the lounge — just lifted enough to clear the
+   room bar sitting at the very bottom, instead of moving to the top where
+   it collided with "THE ROOM" title. */
 .status-strip.is-room {
-  top: 12px;
-  bottom: auto;
+  bottom: 58px;
 }
 
 .status-dot {
