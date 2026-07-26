@@ -1,6 +1,19 @@
+import fs from 'node:fs';
+import path from 'node:path';
 import pty, { type IPty } from 'node-pty';
 
 const BUFFER_CAP = 10_000;
+
+// Demo-only "collaborative coding": each room gets its own pre-made clone/
+// branch of a real project at ~/demo/<roomId>, so different rooms' real
+// Claude Code sessions are genuinely editing different working copies of
+// the same repo instead of colliding in one shared directory. Falls back to
+// $HOME if that folder hasn't been set up (e.g. in dev, or a room whose
+// owner doesn't have a pre-made demo folder).
+function resolveCwd(roomId: string): string {
+  const demoDir = path.join(process.env.HOME ?? '', 'demo', roomId);
+  return fs.existsSync(demoDir) ? demoDir : process.env.HOME ?? process.cwd();
+}
 
 interface TerminalSession {
   pty: IPty;
@@ -13,12 +26,14 @@ function appendToBuffer(session: TerminalSession, chunk: string) {
   session.buffer = (session.buffer + chunk).slice(-BUFFER_CAP);
 }
 
-function spawnClaudeOrFallback(): IPty {
+function spawnClaudeOrFallback(roomId: string): IPty {
+  const cwd = resolveCwd(roomId);
+  console.log(`[terminal] room ${roomId} -> cwd ${cwd}`);
   const opts = {
     name: 'xterm-color',
     cols: 100,
     rows: 30,
-    cwd: process.env.HOME,
+    cwd,
     env: process.env as Record<string, string>,
   };
   try {
@@ -40,7 +55,7 @@ export function getOrCreateSession(
   const existing = sessions.get(roomId);
   if (existing) return existing;
 
-  const term = spawnClaudeOrFallback();
+  const term = spawnClaudeOrFallback(roomId);
   const session: TerminalSession = { pty: term, buffer: '' };
   sessions.set(roomId, session);
 
