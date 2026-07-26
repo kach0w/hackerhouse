@@ -3,7 +3,7 @@ import type {
   TerminalClientToServer,
   TerminalServerToClient,
 } from '@hackerhouse/shared';
-import { getOrCreateSession, getSession } from './pty.js';
+import { getActiveRoomIds, getOrCreateSession, getSession } from './pty.js';
 
 /**
  * Ownership check: the room owner is whoever connects with
@@ -19,6 +19,15 @@ function isOwnerOf(socket: Socket, roomId: string): boolean {
 export function registerTerminalNamespace(io: Server) {
   const nsp = io.of('/terminal');
 
+  // Main-namespace connection (separate socket from /terminal entirely) —
+  // send whoever just loaded the app a snapshot of already-running sessions,
+  // since terminal:active deltas alone would miss anything started earlier.
+  io.on('connection', (socket) => {
+    for (const roomId of getActiveRoomIds()) {
+      socket.emit('terminal:active', { roomId, active: true });
+    }
+  });
+
   nsp.on(
     'connection',
     (socket: Socket<TerminalClientToServer, TerminalServerToClient>) => {
@@ -30,9 +39,19 @@ export function registerTerminalNamespace(io: Server) {
         owner = isOwnerOf(socket, roomId);
         socket.join(roomId);
 
-        const session = getOrCreateSession(roomId, (data) => {
-          nsp.to(roomId).emit('terminal:output', { roomId, data });
-        });
+        // Broadcast on the MAIN namespace (not /terminal) — the lounge
+        // roster lives there, not here.
+        const isNewSession = !getSession(roomId);
+        const session = getOrCreateSession(
+          roomId,
+          (data) => {
+            nsp.to(roomId).emit('terminal:output', { roomId, data });
+          },
+          () => io.emit('terminal:active', { roomId, active: false }),
+        );
+        if (isNewSession) {
+          io.emit('terminal:active', { roomId, active: true });
+        }
 
         socket.emit('terminal:ready', { roomId });
         if (session.buffer) {

@@ -17,6 +17,10 @@ export interface ServerToClientEvents {
   'room:enter:denied': (payload: { roomId: string; reason: 'locked' }) => void;
   'agent:done': (payload: { userId: string; roomId: string }) => void;
   'jukebox:state': (payload: JukeboxState) => void;
+  // Whether a room has a live terminal session (someone's claude/$SHELL pty
+  // is actually running there right now) — lets the lounge roster show who's
+  // heads-down vs. who hasn't started anything yet.
+  'terminal:active': (payload: { roomId: string; active: boolean }) => void;
 }
 
 // ---- Terminal namespace ("/terminal") ----

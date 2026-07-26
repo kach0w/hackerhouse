@@ -54,7 +54,8 @@ function spawnClaudeOrFallback(roomId: string): IPty {
 /** Lazily creates (or returns the existing) PTY for a room, wired to broadcast output. */
 export function getOrCreateSession(
   roomId: string,
-  onData: (data: string) => void
+  onData: (data: string) => void,
+  onExit?: () => void
 ): TerminalSession {
   const existing = sessions.get(roomId);
   if (existing) return existing;
@@ -69,6 +70,7 @@ export function getOrCreateSession(
   });
   term.onExit(() => {
     sessions.delete(roomId);
+    onExit?.();
   });
 
   return session;
@@ -76,4 +78,9 @@ export function getOrCreateSession(
 
 export function getSession(roomId: string): TerminalSession | undefined {
   return sessions.get(roomId);
+}
+
+/** Snapshot for newly-connecting clients — deltas alone miss sessions already running. */
+export function getActiveRoomIds(): string[] {
+  return [...sessions.keys()];
 }

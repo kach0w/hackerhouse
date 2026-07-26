@@ -59,6 +59,8 @@ interface SocketApi {
   /** Shared lounge jam — null until the server's first jukebox:state arrives. */
   jukebox: JukeboxState | null;
   skipTrack: () => void;
+  /** roomIds with a live terminal session (someone's claude/$SHELL pty running right now). */
+  activeRooms: Set<string>;
 }
 
 const Ctx = createContext<SocketApi | null>(null);
@@ -90,6 +92,7 @@ export function SocketProvider({ children }: { children: ReactNode }) {
   const [agentDone, setAgentDone] = useState<{ userId: string; roomId: string } | null>(null);
   const [connectError, setConnectError] = useState<string | null>(null);
   const [jukebox, setJukebox] = useState<JukeboxState | null>(null);
+  const [activeRooms, setActiveRooms] = useState<Set<string>>(new Set());
 
   // Mock is opt-in, never a silent fallback.
   const usingMock = new URLSearchParams(window.location.search).get('mock') === '1';
@@ -117,12 +120,20 @@ export function SocketProvider({ children }: { children: ReactNode }) {
       if (p.userId === identity.userId) setAgentDone(p);
     };
     const onJukebox = (p: JukeboxState) => setJukebox(p);
+    const onTerminalActive = (p: { roomId: string; active: boolean }) =>
+      setActiveRooms((prev) => {
+        const next = new Set(prev);
+        if (p.active) next.add(p.roomId);
+        else next.delete(p.roomId);
+        return next;
+      });
 
     socket.on('presence:update', onPresence);
     socket.on('room:update', onRoom);
     socket.on('room:enter:denied', onDenied);
     socket.on('agent:done', onAgentDone);
     socket.on('jukebox:state', onJukebox);
+    socket.on('terminal:active', onTerminalActive);
 
     if (real) {
       // Re-`join` on every connect, not once at mount: after a dropped
@@ -131,6 +142,10 @@ export function SocketProvider({ children }: { children: ReactNode }) {
       real.on('connect', () => {
         setConnected(true);
         setConnectError(null);
+        // Stale entries would otherwise linger from before a reconnect — the
+        // server resends a fresh snapshot right after this on its own
+        // 'connection' handler, so clearing first is safe, not a flicker.
+        setActiveRooms(new Set());
         socket.emit('join', identity);
       });
       real.on('disconnect', () => setConnected(false));
@@ -157,6 +172,7 @@ export function SocketProvider({ children }: { children: ReactNode }) {
       socket.off('room:enter:denied', onDenied);
       socket.off('agent:done', onAgentDone);
       socket.off('jukebox:state', onJukebox);
+      socket.off('terminal:active', onTerminalActive);
       socket.disconnect();
       socketRef.current = null;
       setConnected(false);
@@ -207,6 +223,7 @@ export function SocketProvider({ children }: { children: ReactNode }) {
       setLocked,
       jukebox,
       skipTrack,
+      activeRooms,
     };
   }, [
     connected,
@@ -225,6 +242,7 @@ export function SocketProvider({ children }: { children: ReactNode }) {
     setLocked,
     jukebox,
     skipTrack,
+    activeRooms,
   ]);
 
   return <Ctx.Provider value={value}>{children}</Ctx.Provider>;

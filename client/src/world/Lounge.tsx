@@ -2,8 +2,10 @@
  * The lounge view: a Pixi canvas plus the HUD layered over it.
  *
  * There is no movement control here by design — your avatar runs its own
- * ambient loop. The only player agency in the lounge is clicking another
- * character to visit their room, and the button to head back to your own.
+ * ambient loop. Avatars in the scene are purely decorative — the only way to
+ * visit anyone's room is the sidebar roster, not clicking a character. That
+ * also covers owners currently in their own room, whose avatar isn't in the
+ * lounge scene at all while they're in there.
  */
 
 import { useEffect, useRef, useState } from 'react';
@@ -21,17 +23,12 @@ interface Props {
 export function Lounge({ onStageReady, onGoToRoom }: Props) {
   const hostRef = useRef<HTMLDivElement>(null);
   const stageRef = useRef<LoungeStage | null>(null);
-  const { selfId, users, loungeUsers, rooms, sendMove, deniedRoomId } = useSocket();
+  const { selfId, users, loungeUsers, rooms, sendMove, deniedRoomId, activeRooms } = useSocket();
 
-  // Owners currently heads-down at their own desk — their avatar isn't in the
-  // lounge scene at all while they're in there, so this is the only way to
-  // find and visit them. `roomId === userId` picks out the owner, not a
-  // visitor riding along in someone else's room.
-  const inRoomUsers = users.filter(
-    (u) => u.state === 'room' && u.roomId === u.userId && u.userId !== selfId,
-  );
+  // Everyone but yourself, each with a room you can visit regardless of
+  // whether they're currently sitting in it or out in the lounge.
+  const others = users.filter((u) => u.userId !== selfId);
 
-  const [selected, setSelected] = useState<string | null>(null);
   const [toast, setToast] = useState<string | null>(null);
 
   // Keep the latest callbacks and presence reachable from the Pixi loop without
@@ -52,7 +49,6 @@ export function Lounge({ onStageReady, onGoToRoom }: Props) {
     let disposed = false;
     const stage = new LoungeStage(host, {
       onSelfMove: (x, y, facing) => sendMoveRef.current(x, y, facing),
-      onAvatarClick: (userId) => setSelected(userId),
       onStationClick: () => {
         // Reserved for the 1v1 minigames. Intentionally inert tonight.
       },
@@ -94,8 +90,6 @@ export function Lounge({ onStageReady, onGoToRoom }: Props) {
     return () => clearTimeout(t);
   }, [deniedRoomId, users]);
 
-  const selectedUser = selected ? users.find((u) => u.userId === selected) : undefined;
-  const selectedRoom = selected ? rooms.get(selected) : undefined;
   const myRoom = rooms.get(selfId);
 
   return (
@@ -107,12 +101,13 @@ export function Lounge({ onStageReady, onGoToRoom }: Props) {
         <div className="hud-sub">{loungeUsers.length} building tonight</div>
       </div>
 
-      {inRoomUsers.length > 0 && (
+      {others.length > 0 && (
         <div className="hud hud-left">
-          <div className="room-roster-label">in their room</div>
+          <div className="room-roster-label">visit a room</div>
           <div className="room-roster">
-            {inRoomUsers.map((u) => {
+            {others.map((u) => {
               const locked = rooms.get(u.userId)?.locked;
+              const agentRunning = activeRooms.has(u.userId);
               return (
                 <button
                   key={u.userId}
@@ -121,8 +116,15 @@ export function Lounge({ onStageReady, onGoToRoom }: Props) {
                   title={locked ? `${u.name}'s door is locked` : `Visit ${u.name}'s room`}
                   onClick={() => onGoToRoom(u.userId)}
                 >
-                  <span className="room-roster-name">{u.name}</span>
-                  <span className="room-roster-status">{locked ? '🔒' : 'visit →'}</span>
+                  <span className="room-roster-name">
+                    {agentRunning && (
+                      <span className="room-roster-agent-dot" title="agent running" />
+                    )}
+                    {u.name}
+                  </span>
+                  <span className="room-roster-status">
+                    {locked ? '🔒' : u.state === 'room' ? 'at desk →' : 'in lounge →'}
+                  </span>
                 </button>
               );
             })}
@@ -136,30 +138,6 @@ export function Lounge({ onStageReady, onGoToRoom }: Props) {
         </button>
         {myRoom?.locked && <span className="hud-note">your door is locked</span>}
       </div>
-
-      {selectedUser && selectedUser.userId !== selfId && (
-        <div className="popover">
-          <div className="popover-name">{selectedUser.name}</div>
-          <div className="popover-sub">
-            {selectedRoom?.locked ? 'door is locked' : 'door is open'}
-          </div>
-          <div className="popover-actions">
-            <button
-              className="btn btn-primary"
-              disabled={selectedRoom?.locked}
-              onClick={() => {
-                setSelected(null);
-                onGoToRoom(selectedUser.userId);
-              }}
-            >
-              Visit their room
-            </button>
-            <button className="btn" onClick={() => setSelected(null)}>
-              Close
-            </button>
-          </div>
-        </div>
-      )}
 
       {toast && <div className="toast">{toast}</div>}
     </div>

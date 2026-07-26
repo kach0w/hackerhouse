@@ -14,6 +14,11 @@ import gsap from 'gsap';
 import { Jukebox } from './components/Jukebox';
 import { VoiceControls } from './components/VoiceControls';
 import { SocketProvider, useSocket } from './hooks/useSocket';
+import {
+  notificationPermission,
+  requestNotificationPermission,
+  usePushNotifications,
+} from './hooks/usePushNotifications';
 import { AgentDoneCharacter } from './world/AgentDoneCharacter';
 import { Lounge } from './world/Lounge';
 import { Room } from './world/Room';
@@ -38,7 +43,15 @@ function House() {
     jukebox,
     skipTrack,
     users,
+    rooms,
   } = useSocket();
+
+  usePushNotifications({ selfId, agentDone, rooms, users });
+
+  const [notifPermission, setNotifPermission] = useState(notificationPermission());
+  const toggleNotifications = useCallback(() => {
+    void requestNotificationPermission().then(setNotifPermission);
+  }, []);
 
   // Dev shortcut: `?view=room` boots straight into your room with the terminal
   // already down, so you can iterate on the Room without walking there each
@@ -175,6 +188,20 @@ function House() {
       <div className={`status-strip${view === 'room' ? ' is-room' : ''}`}>
         <span className={`status-dot${connected ? ' is-on' : ''}`} />
         <span>{self?.name ?? '…'}</span>
+        {notifPermission !== 'unsupported' && notifPermission !== 'granted' && (
+          <button
+            className="status-notif-btn"
+            title={
+              notifPermission === 'denied'
+                ? 'Notifications blocked — allow them in your browser settings'
+                : 'Get notified even when this tab is in the background'
+            }
+            onClick={toggleNotifications}
+            disabled={notifPermission === 'denied'}
+          >
+            🔔 enable notifications
+          </button>
+        )}
         {usingMock && <span className="status-mock">mock server</span>}
         {!usingMock && connectError && (
           <span className="status-error">no server at {httpBase} — {connectError}</span>
@@ -198,6 +225,7 @@ function NameGate({ onSubmit }: { onSubmit: (name: string) => void }) {
     e.preventDefault();
     const trimmed = value.trim();
     if (!trimmed) return;
+    requestNotificationPermission(); // must be a real click, not a page-load call
     onSubmit(trimmed);
   };
 

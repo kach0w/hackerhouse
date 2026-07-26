@@ -8,18 +8,18 @@
  * the local player and clamps at the room edges.
  */
 
-import { Application, Circle, Container, Sprite, Texture } from 'pixi.js';
+import { Application, Container, Sprite, Texture } from 'pixi.js';
 
 import { Px } from '../art/PixelCanvas';
 import { METAL, OUTLINE, WALL, WOOD, shade } from '../art/palette';
-import { shadowSprite } from '../art/props';
+import { corgiPet, shadowSprite } from '../art/props';
 import { FLOOR_VARIANTS, baseboardTile, floorTile, wallTile, wallTopTile } from '../art/tiles';
 import type { User } from '@hackerhouse/shared';
 import { Avatar, type Facing } from './Avatar';
 import { AmbientController } from './ambient';
 import {
   ARRIVE_EPS,
-  AVATAR_HIT_RADIUS,
+  FLOOR_TOP,
   LOUNGE_H,
   LOUNGE_PX_H,
   LOUNGE_PX_W,
@@ -27,8 +27,10 @@ import {
   SCRIPT_WALK_SPEED,
   STAIRS,
   TILE,
+  WALK_SPEED,
   WALL_ROWS,
   WORLD_SCALE,
+  clampToFloor,
   facingFromDelta,
 } from './layout';
 import { DECOR, STATIONS } from './stations';
@@ -38,6 +40,18 @@ const PEER_LERP = 12;
 
 /** Camera easing — snappy enough to keep up, soft enough not to jitter. */
 const CAM_LERP = 6;
+
+/** A corgi wanders slower and lazier than the ambient human loop. */
+const PET_SPEED = WALK_SPEED * 0.55;
+
+interface Pet {
+  container: Container;
+  sprite: Sprite;
+  pos: { x: number; y: number };
+  target: { x: number; y: number } | null;
+  timer: number;
+  facingLeft: boolean;
+}
 
 /**
  * Roughly how much of the room we want on screen, in native px. The zoom is
@@ -51,7 +65,6 @@ const MAX_SCALE = 4;
 
 export interface LoungeCallbacks {
   onSelfMove: (x: number, y: number, facing: Facing) => void;
-  onAvatarClick: (userId: string) => void;
   /** Clicking a station. Inert tonight — the seam for 1v1 minigames. */
   onStationClick?: (stationId: string) => void;
 }
@@ -99,6 +112,7 @@ export class LoungeStage {
   private sortLayer = new Container();
   private avatars = new Map<string, Avatar>();
   private targets = new Map<string, PeerTarget>();
+  private pets: Pet[] = [];
 
   private selfId = '';
   private selfPos = { x: 240, y: 200 };
@@ -137,6 +151,7 @@ export class LoungeStage {
 
     this.drawFloorAndWalls();
     this.drawProps();
+    this.spawnPets();
     this.centerCamera(true);
 
     this.ro = new ResizeObserver(() => this.centerCamera(true));
@@ -193,11 +208,9 @@ export class LoungeStage {
 
       let av = this.avatars.get(u.userId);
       if (!av) {
+        // Not clickable — visiting a room only happens via the sidebar
+        // roster now, so avatars are purely decorative in the lounge scene.
         av = new Avatar(u.userId, u.name);
-        av.eventMode = 'static';
-        av.cursor = 'pointer';
-        av.hitArea = new Circle(0, -12, AVATAR_HIT_RADIUS);
-        av.on('pointertap', () => this.cb.onAvatarClick(u.userId));
         this.avatars.set(u.userId, av);
         this.sortLayer.addChild(av);
         av.position.set(u.x, u.y);
@@ -225,6 +238,7 @@ export class LoungeStage {
   private tick(dt: number) {
     this.updateSelf(dt);
     this.updatePeers(dt);
+    this.updatePets(dt);
     this.updateCamera(dt);
 
     for (const av of this.avatars.values()) av.zIndex = av.y;
@@ -433,6 +447,76 @@ export class LoungeStage {
       add(s.sprite(), s.x, s.y, s.footY, {
         onTap: this.cb.onStationClick ? () => this.cb.onStationClick?.(s.id) : undefined,
       });
+    }
+  }
+
+  /** A couple of corgis that wander the floor on their own, same as the ambient humans. */
+  private spawnPets() {
+    const shadowTex = shadowSprite(20, 8).toTexture();
+    const starts = [
+      { x: 130, y: 300 },
+      { x: 230, y: 296 },
+    ];
+
+    for (const pos of starts) {
+      const container = new Container();
+      const sh = new Sprite(shadowTex);
+      sh.anchor.set(0.5, 0.5);
+      sh.alpha = 0.3;
+      sh.position.set(11, 17);
+      container.addChild(sh);
+
+      const sprite = new Sprite(corgiPet(false).toTexture());
+      container.addChild(sprite);
+      container.position.set(pos.x, pos.y);
+      this.sortLayer.addChild(container);
+
+      this.pets.push({
+        container,
+        sprite,
+        pos: { ...pos },
+        target: null,
+        timer: 500 + Math.random() * 2000,
+        facingLeft: false,
+      });
+    }
+  }
+
+  private updatePets(dt: number) {
+    for (const pet of this.pets) {
+      if (!pet.target) {
+        pet.timer -= dt * 1000;
+        if (pet.timer <= 0) {
+          const p = clampToFloor(
+            LOUNGE_PX_W * 0.15 + Math.random() * LOUNGE_PX_W * 0.7,
+            FLOOR_TOP + 40 + Math.random() * (LOUNGE_PX_H - FLOOR_TOP - 60),
+          );
+          pet.target = p;
+        }
+      } else {
+        const dx = pet.target.x - pet.pos.x;
+        const dy = pet.target.y - pet.pos.y;
+        const d = Math.hypot(dx, dy);
+
+        if (d < PET_SPEED * dt) {
+          pet.pos = { ...pet.target };
+          pet.target = null;
+          pet.timer = 1500 + Math.random() * 3500;
+        } else {
+          const step = (PET_SPEED * dt) / d;
+          pet.pos = { x: pet.pos.x + dx * step, y: pet.pos.y + dy * step };
+          if (Math.abs(dx) > 1) {
+            const facingLeft = dx < 0;
+            if (facingLeft !== pet.facingLeft) {
+              pet.facingLeft = facingLeft;
+              pet.sprite.texture = corgiPet(facingLeft).toTexture();
+            }
+          }
+        }
+      }
+
+      pet.container.position.set(pet.pos.x, pet.pos.y);
+      pet.container.zIndex = pet.pos.y;
     }
   }
 }
