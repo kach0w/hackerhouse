@@ -47,6 +47,19 @@
     }
     .door:hover { background: rgba(100,200,100,0.1); }
 
+    /* --- furniture (solid obstacles avatars collide with) --- */
+    .furniture {
+      position: absolute; box-sizing: border-box; z-index: 1;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 10px; color: #ddd; border-radius: 4px;
+      box-shadow: 0 2px 6px rgba(0,0,0,0.4);
+    }
+    .furniture.couch { background: #6b4a3a; }
+    .furniture.table { background: #8a6b4a; }
+    .furniture.bookshelf { background: #4a3a2a; }
+    .furniture.plant { background: #2f5c2f; border-radius: 50%; }
+    .avatar { z-index: 2; }
+
     /* --- fade overlay for transitions --- */
     #fade {
       position: fixed; inset: 0; background: #000; opacity: 0;
@@ -66,6 +79,11 @@
       <span id="status">2 others here (placeholder)</span>
     </div>
     <div class="floor"></div>
+    <div class="furniture couch" style="left: 40px; top: 380px; width: 160px; height: 50px;">couch</div>
+    <div class="furniture table" style="left: 260px; top: 260px; width: 80px; height: 50px;">table</div>
+    <div class="furniture bookshelf" style="left: 620px; top: 40px; width: 50px; height: 150px;">shelf</div>
+    <div class="furniture plant" style="left: 520px; top: 220px; width: 34px; height: 34px;">🪴</div>
+    <div class="furniture plant" style="left: 60px; top: 60px; width: 34px; height: 34px;">🪴</div>
     <div class="avatar" id="meAvatar" style="left: 300px; top: 200px;"><span class="label">you</span>me</div>
     <div class="avatar" id="other1" style="left: 150px; top: 120px;"><span class="label">alex</span>a</div>
     <div class="avatar" id="other2" style="left: 450px; top: 300px;"><span class="label">sam</span>s</div>
@@ -104,6 +122,112 @@
         setTimeout(() => fade.classList.remove("active"), 50);
       }, 400);
     }
+
+    // ---------- lounge movement & furniture collision ----------
+    const loungeEl = document.getElementById("loungeView");
+    const furnitureEls = Array.from(document.querySelectorAll(".furniture"));
+
+    function rectFromStyle(el) {
+      return { x: parseFloat(el.style.left) || 0, y: parseFloat(el.style.top) || 0, w: el.offsetWidth, h: el.offsetHeight };
+    }
+    function getObstacles() {
+      return furnitureEls.map(rectFromStyle);
+    }
+    function rectsOverlap(a, b) {
+      return a.x < b.x + b.w && a.x + a.w > b.x && a.y < b.y + b.h && a.y + a.h > b.y;
+    }
+    function collidesAt(x, y, w, h, obstacles) {
+      const box = { x, y, w, h };
+      return obstacles.some((o) => rectsOverlap(box, o));
+    }
+
+    // Resolves movement one axis at a time so an avatar blocked by furniture
+    // on one axis still slides along it on the other, instead of freezing.
+    function moveWithCollision(entity, dx, dy, obstacles) {
+      const floorW = loungeEl.clientWidth;
+      const floorH = loungeEl.clientHeight;
+      let { x, y, w, h } = entity;
+
+      if (dx !== 0) {
+        const nx = Math.max(0, Math.min(floorW - w, x + dx));
+        if (!collidesAt(nx, y, w, h, obstacles)) x = nx;
+      }
+      if (dy !== 0) {
+        const ny = Math.max(0, Math.min(floorH - h, y + dy));
+        if (!collidesAt(x, ny, w, h, obstacles)) y = ny;
+      }
+
+      entity.x = x;
+      entity.y = y;
+      entity.el.style.left = `${x}px`;
+      entity.el.style.top = `${y}px`;
+    }
+
+    function makeEntity(el, speed) {
+      return { el, x: parseFloat(el.style.left) || 0, y: parseFloat(el.style.top) || 0, w: 32, h: 32, speed };
+    }
+
+    const player = makeEntity(document.getElementById("meAvatar"), 3.2);
+
+    const pressedKeys = new Set();
+    window.addEventListener("keydown", (e) => {
+      if (document.activeElement && ["INPUT", "TEXTAREA"].includes(document.activeElement.tagName)) return;
+      pressedKeys.add(e.key.toLowerCase());
+    });
+    window.addEventListener("keyup", (e) => pressedKeys.delete(e.key.toLowerCase()));
+
+    function playerStep(obstacles) {
+      let dx = 0, dy = 0;
+      if (pressedKeys.has("arrowleft") || pressedKeys.has("a")) dx -= 1;
+      if (pressedKeys.has("arrowright") || pressedKeys.has("d")) dx += 1;
+      if (pressedKeys.has("arrowup") || pressedKeys.has("w")) dy -= 1;
+      if (pressedKeys.has("arrowdown") || pressedKeys.has("s")) dy += 1;
+      if (dx === 0 && dy === 0) return;
+      if (dx !== 0 && dy !== 0) { dx *= 0.7071; dy *= 0.7071; }
+      moveWithCollision(player, dx * player.speed, dy * player.speed, obstacles);
+    }
+
+    function makeWanderer(el, speed) {
+      const w = makeEntity(el, speed);
+      w.target = null;
+      return w;
+    }
+    function retarget(w, floorW, floorH) {
+      w.target = {
+        x: 10 + Math.random() * Math.max(1, floorW - w.w - 20),
+        y: 10 + Math.random() * Math.max(1, floorH - w.h - 20),
+      };
+    }
+    function wandererStep(w, obstacles) {
+      const floorW = loungeEl.clientWidth;
+      const floorH = loungeEl.clientHeight;
+      if (!w.target) retarget(w, floorW, floorH);
+      const ddx = w.target.x - w.x;
+      const ddy = w.target.y - w.y;
+      const dist = Math.hypot(ddx, ddy);
+      if (dist < 4) { retarget(w, floorW, floorH); return; }
+      const dx = (ddx / dist) * w.speed;
+      const dy = (ddy / dist) * w.speed;
+      const beforeX = w.x, beforeY = w.y;
+      moveWithCollision(w, dx, dy, obstacles);
+      // Stuck against a piece of furniture — pick a new spot rather than pushing forever.
+      if (Math.abs(w.x - beforeX) < 0.01 && Math.abs(w.y - beforeY) < 0.01) retarget(w, floorW, floorH);
+    }
+
+    const wanderers = [
+      makeWanderer(document.getElementById("other1"), 1.1),
+      makeWanderer(document.getElementById("other2"), 1.3),
+    ];
+
+    function loungeLoop() {
+      if (loungeView.classList.contains("active")) {
+        const obstacles = getObstacles();
+        playerStep(obstacles);
+        wanderers.forEach((w) => wandererStep(w, obstacles));
+      }
+      requestAnimationFrame(loungeLoop);
+    }
+    requestAnimationFrame(loungeLoop);
 
     document.getElementById("toRoomBtn").onclick = () => switchView(false);
     document.getElementById("doorToRoom").onclick = () => switchView(false);
