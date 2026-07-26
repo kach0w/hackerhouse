@@ -9,7 +9,7 @@
 set -euo pipefail
 
 TOKEN="${1:?token required (copied from the app)}"
-ORIGIN="${2:?origin required (the app's URL)}"
+ORIGIN="${2:?origin required (the app URL)}"
 USER_ID="${3:?userId required (your own userId, same one the app uses)}"
 AGENT_DIR="$HOME/.hackerhouse-agent"
 
