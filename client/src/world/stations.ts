@@ -197,5 +197,3 @@ export const DECOR: Decor[] = [
   { id: 'poster-1', sprite: () => poster('#3f84d6'), x: 288, y: 10, footY: 40 },
   { id: 'poster-2', sprite: () => poster('#c96f52'), x: 396, y: 10, footY: 40 },
 ];
-
-export const STATION_BY_ID = new Map(STATIONS.map((s) => [s.id, s]));

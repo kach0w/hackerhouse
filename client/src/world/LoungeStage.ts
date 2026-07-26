@@ -174,10 +174,6 @@ export class LoungeStage {
     this.script = null;
   }
 
-  getSelfPosition() {
-    return { ...this.selfPos };
-  }
-
   setSelfPosition(x: number, y: number) {
     this.selfPos = { x, y };
     this.centerCamera(true);
