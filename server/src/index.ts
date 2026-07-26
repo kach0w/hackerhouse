@@ -23,7 +23,7 @@ app.get('/health', (_req, res) => {
 
 const httpServer = http.createServer(app);
 
-export const io = new Server<ClientToServerEvents, ServerToClientEvents>(httpServer, {
+const io = new Server<ClientToServerEvents, ServerToClientEvents>(httpServer, {
   cors: { origin: CLIENT_ORIGIN },
 });
 

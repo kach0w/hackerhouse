@@ -53,9 +53,52 @@ LiveKit room names D will use:
 
 ## Builder A — State server & contract
 
-- **Last update:** 2026-07-26T06:05Z
-- **Status:** done — spine live, verified, and just hardened after a self-review.
+- **Last update:** 2026-07-26T08:10Z
+- **Status:** done — spine live, verified, hardened after a self-review, and
+  now the session-identity gap flagged below (and independently by C) is closed.
 - **Goals now:** available to help unblock B/C/D; will keep polling this file.
+- **NEW — session tokens (closes the trust gap C and I both flagged below):**
+  - `server/src/state/socket.ts` now exports `mintSessionToken(userId)` and
+    `verifySession(token): { userId } | null` — HMAC-SHA256 over
+    `{userId, expires}`, secret from `SESSION_SECRET` env (falls back to an
+    insecure dev default with a loud `console.warn` if unset), 24h TTL,
+    `crypto.timingSafeEqual` for the signature check.
+  - `join` payload gains an optional `token`. If present and valid, its
+    userId wins over whatever the client claims in `userId` — this is the
+    real reconnect path. No/invalid token still falls back to trusting the
+    claimed userId as a fresh identity (first-come, same trust level as
+    before — this is a trusted-group demo, not a login system).
+  - New `join:ok` server event: `{ userId, token }`, sent once per `join`
+    (minted fresh on a first/untrusted claim, echoed back unchanged on a
+    verified reconnect). **C — this is the primitive for the shared trust
+    gap we both flagged:** swap `/terminal`'s `handshake.auth.userId ===
+    roomId` check for `verifySession(handshake.auth.token)` (import
+    `verifySession` from `server/src/state/socket.ts`) once B is persisting
+    and sending the token — same idea probably applies to D's `/notify`.
+  - **B:** persist `join:ok`'s `token` (e.g. localStorage) and send it back
+    as `join`'s `token` field on reconnect, and pass it as
+    `handshake.auth.token` on the `/terminal` connection once C wires up the
+    check above.
+  - Also fixed two smaller bugs while in this file: `room:leave` was
+    broadcasting `room:update` for whatever `roomId` the client claimed
+    instead of the room the user was actually in (now relies on
+    `leaveCurrentRoom`'s broadcast, which reads real state); dropped the
+    unused `export` on `index.ts`'s `io` (nothing imports it, no reason to
+    widen the surface).
+- **NEW — disconnect grace period + room GC:** `disconnect` used to delete
+  presence and room occupancy immediately. Now it schedules a sweep
+  (`DISCONNECT_GRACE_MS`, 30s default, env-overridable) instead — a refresh
+  or brief drop no longer wipes x/y/state/roomId, `join`'s pending-sweep
+  check cancels the timer on reconnect. If the sweep fires for a user who
+  owned a room, that room is now torn down and any occupants are sent back
+  to the lounge (previously rooms were never cleaned up at all). Covered by
+  6 new checks in `server/src/state/verify.ts` (token round-trip, reconnect
+  override, invalid-token fallback, grace-period position preservation, GC).
+  Also fixed a pre-existing race in `verify.ts`'s first test (sequential
+  `await waitFor(a,...); await waitFor(b,...)` could miss B's event if it
+  fired before the second listener attached — now `Promise.all`, matching
+  the pattern the rest of the file already uses). All 12 checks pass,
+  `tsc --noEmit` clean in `shared/`, `server/`, and `client/`.
 - **Self-review findings + fixes (ran /code-review medium on the shared+server
   diff, all in files I own, no other builder's directories touched):**
   - **FIXED — reconnect race:** `disconnect` was deleting the user from
