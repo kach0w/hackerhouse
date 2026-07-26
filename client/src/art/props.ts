@@ -103,6 +103,51 @@ export function pingPongTable(): Px {
   return p;
 }
 
+/** Standing arcade cabinet. Opens Snake when clicked. */
+export function arcadeCabinet(): Px {
+  const p = new Px(34, 58);
+  const body = '#4a3560';
+  const trim = '#6b4e88';
+
+  // Cabinet body, angled control deck, and base.
+  p.rect(2, 6, 30, 40, body);
+  p.rect(2, 6, 30, 2, shade(body, 0.3));
+  p.rect(2, 6, 2, 40, shade(body, 0.18));
+  p.rect(30, 6, 2, 40, shade(body, -0.25));
+  p.rect(0, 46, 34, 8, trim);
+  p.rect(0, 46, 34, 2, shade(trim, 0.25));
+  p.rect(1, 54, 32, 3, shade(body, -0.4));
+
+  // Marquee.
+  p.rect(4, 2, 26, 6, '#f0c03f');
+  p.rect(4, 2, 26, 1, '#fce39a');
+  p.rect(7, 4, 4, 2, '#d64a3f');
+  p.rect(13, 4, 4, 2, '#46ad6a');
+  p.rect(19, 4, 4, 2, '#3f84d6');
+
+  // Screen with a tiny snake on it.
+  p.rect(5, 11, 24, 22, '#11161f');
+  p.rect(6, 12, 22, 20, '#0c2018');
+  p.dither(6, 12, 22, 20, '#122a20', 0);
+  for (let i = 0; i < 5; i++) p.rect(9 + i * 3, 20, 2, 2, '#5fd67a');
+  p.rect(23, 16, 2, 2, '#e8564f');
+  p.rect(5, 11, 24, 1, shade('#11161f', 0.4));
+
+  // Control deck: joystick + two buttons.
+  p.rect(4, 35, 26, 9, shade(body, -0.15));
+  p.rect(4, 35, 26, 2, shade(body, 0.1));
+  p.rect(10, 38, 2, 4, METAL.dark);
+  p.circle(11, 37, 2, '#d64a3f');
+  p.circle(19, 40, 2, '#f0c03f');
+  p.circle(24, 40, 2, '#3f84d6');
+
+  // Coin slot.
+  p.rect(15, 48, 5, 2, shade(trim, -0.4));
+
+  p.outline(OUTLINE);
+  return p;
+}
+
 export function couch(): Px {
   const p = new Px(64, 38);
   const base = '#7a5a92';
