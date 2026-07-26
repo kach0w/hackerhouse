@@ -100,6 +100,9 @@ export function SocketProvider({ children }: { children: ReactNode }) {
 
   // Outbound move throttle: buffer the latest position, flush on an interval.
   const pendingMove = useRef<{ x: number; y: number; facing: Facing } | null>(null);
+  // Signed session token from join:ok — sent back on reconnect, and needed
+  // to launch your own local terminal agent (see server/src/terminal/agent.ts).
+  const sessionToken = useRef<string | null>(null);
 
   useEffect(() => {
     const real = usingMock ? null : io(httpBase, { transports: ['websocket'] });
@@ -127,6 +130,18 @@ export function SocketProvider({ children }: { children: ReactNode }) {
         else next.delete(p.roomId);
         return next;
       });
+    const onJoinOk = (p: { userId: string; token: string }) => {
+      if (p.userId !== identity.userId) return;
+      sessionToken.current = p.token;
+      // Only the owner can ever use their own token to run an agent, so
+      // logging it is only actionable by the person it belongs to.
+      console.log(
+        `%c[hackerhouse] to run your own terminal on your own machine:\n\n` +
+          `HACKERHOUSE_SERVER_URL=${httpBase} HACKERHOUSE_USER_ID=${identity.userId} ` +
+          `HACKERHOUSE_SESSION_TOKEN=${p.token} npm run agent --workspace server\n`,
+        'color: #7fe3c0',
+      );
+    };
 
     socket.on('presence:update', onPresence);
     socket.on('room:update', onRoom);
@@ -134,6 +149,7 @@ export function SocketProvider({ children }: { children: ReactNode }) {
     socket.on('agent:done', onAgentDone);
     socket.on('jukebox:state', onJukebox);
     socket.on('terminal:active', onTerminalActive);
+    socket.on('join:ok', onJoinOk);
 
     if (real) {
       // Re-`join` on every connect, not once at mount: after a dropped
@@ -146,7 +162,7 @@ export function SocketProvider({ children }: { children: ReactNode }) {
         // server resends a fresh snapshot right after this on its own
         // 'connection' handler, so clearing first is safe, not a flicker.
         setActiveRooms(new Set());
-        socket.emit('join', identity);
+        socket.emit('join', { ...identity, token: sessionToken.current ?? undefined });
       });
       real.on('disconnect', () => setConnected(false));
       real.on('connect_error', (err: Error) => {
@@ -173,6 +189,7 @@ export function SocketProvider({ children }: { children: ReactNode }) {
       socket.off('agent:done', onAgentDone);
       socket.off('jukebox:state', onJukebox);
       socket.off('terminal:active', onTerminalActive);
+      socket.off('join:ok', onJoinOk);
       socket.disconnect();
       socketRef.current = null;
       setConnected(false);
