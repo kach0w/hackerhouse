@@ -9,7 +9,7 @@
 set -euo pipefail
 
 TOKEN="${1:?token required (pass the value shown by the app)}"
-ORIGIN="${2:?origin required (pass the app's URL)}"
+ORIGIN="${2:?origin required (pass the app URL)}"
 AGENT_DIR="$HOME/.hackerhouse-agent"
 
 if ! command -v node >/dev/null 2>&1; then
@@ -28,6 +28,22 @@ echo "Installing dependencies (first time only, ~30-60s)..."
 (cd "$AGENT_DIR" && npm install --omit=dev --silent)
 
 NODE_BIN=$(command -v node)
+
+# node-pty only ships prebuilt native bindings for darwin/win32 — everywhere
+# else npm install just fell back to compiling from source via node-gyp,
+# which needs Python + a C++ toolchain. A failed compile doesn't fail
+# `npm install` loudly enough to stop this script, so without this check
+# we'd register an autostart service that can never actually launch a
+# terminal — check it can load before wiring up autostart.
+if ! "$NODE_BIN" -e "require('node-pty')" >/dev/null 2>&1; then
+  echo "Couldn't build your terminal's native module (node-pty)." >&2
+  echo "This usually means Python and a C++ toolchain aren't installed:" >&2
+  echo "  macOS:  xcode-select --install" >&2
+  echo "  Linux:  install Python 3 + gcc/make (e.g. build-essential on Debian/Ubuntu)" >&2
+  echo "Then re-run: curl -fsSL \$ORIGIN/agent/install.sh | bash -s -- \$TOKEN \$ORIGIN" >&2
+  exit 1
+fi
+
 UNAME=$(uname -s)
 
 if [ "$UNAME" = "Darwin" ]; then

@@ -687,19 +687,40 @@
     const agentStatusEl = document.getElementById("agentStatus");
     let agentPollTimer = null;
 
+    // Called when the agent socket goes away unexpectedly (agent process
+    // crashed, laptop slept, network blip) — anything other than the agent
+    // itself telling us the shell exited. Without this, agentConnected stays
+    // stuck `true` forever: term.onData's readyState check silently drops
+    // every keystroke and the visitor sees a terminal that looks fine but
+    // never responds again, with no error and no way back to onboarding
+    // short of a full page reload.
+    function handleAgentDrop(token) {
+      if (!agentConnected) return; // already handled (e.g. a clean "exited" message)
+      agentConnected = false;
+      agentSocket = null;
+      agentOnboard.classList.remove("hidden");
+      terminalEl.classList.add("hidden");
+      startTerminalBtn.disabled = true;
+      agentStatusEl.textContent = "lost connection to your terminal — reconnecting…";
+      startAgentPolling(token);
+    }
+
     // Resolves true/false rather than throwing — a missing local agent (not
     // installed yet, or not running) is the expected common case, not an error.
     function connectAgent(token) {
       return new Promise((resolve) => {
         let settled = false;
         const sock = new WebSocket(`ws://localhost:${AGENT_PORT}`);
-        const fail = () => {
-          if (settled) return;
-          settled = true;
-          resolve(false);
+        const onGone = () => {
+          if (!settled) {
+            settled = true;
+            resolve(false);
+            return;
+          }
+          handleAgentDrop(token);
         };
-        sock.onerror = fail;
-        sock.onclose = fail;
+        sock.onerror = onGone;
+        sock.onclose = onGone;
         sock.onopen = () => sock.send(JSON.stringify({ type: "hello", token }));
         sock.onmessage = (ev) => {
           const msg = JSON.parse(ev.data);

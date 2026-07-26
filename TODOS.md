@@ -31,31 +31,10 @@ Windows into the bash script.
 
 ---
 
-## node-pty prebuild fallback on uncommon platforms
+## ~~node-pty prebuild fallback on uncommon platforms~~ — done
 
-**What:** `local-agent/package.json` pulls in `node-pty@^1.1.0`, which ships
-prebuilt native bindings for `darwin-arm64`, `darwin-x64`, `win32-arm64`, and
-`win32-x64` (confirmed in this session — `npm install` skipped compilation
-entirely on this Mac). Linux and any other arch aren't in that prebuild list,
-so `npm install` on those platforms falls back to compiling from source via
-node-gyp, which needs Python + a C++ toolchain and can fail silently on a
-random visitor's laptop mid-install.
-
-**Why:** A failed `npm install` inside `install.sh` currently just stops with
-an npm error — the visitor sees a wall of node-gyp output instead of a clear
-"here's what to do" message.
-
-**Pros:** Graceful failure (a clear "couldn't build your terminal — need
-Python + Xcode/build-essential" message) turns a confusing hard failure into
-an actionable one.
-
-**Cons:** Real fix (bundling a prebuilt binary for more platforms, or vendoring
-a WASM pty) is out of scope for the hackathon timeline — this is a "detect and
-explain" fix, not a "solve" fix.
-
-**Context:** Add a `postinstall` check in `install.sh` after `npm install`
-that verifies `node -e "require('node-pty')"` succeeds before proceeding to
-the autostart registration step; if it fails, print the Python/build-tools
-hint and exit instead of silently registering a broken service.
-
-**Depends on / blocked by:** Nothing — can be picked up any time.
+`install.sh` now checks `node -e "require('node-pty')"` right after `npm
+install` and exits with a clear Python/build-tools hint instead of silently
+wiring up an autostart service that could never actually launch a terminal.
+Bundling prebuilt binaries for more platforms (the actual "solve", not just
+"detect and explain") is still out of scope for the hackathon timeline.
