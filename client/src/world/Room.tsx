@@ -243,11 +243,13 @@ export function Room({
               🖥
             </button>
           )}
-
-          <button className="btn btn-primary" onClick={onLeave}>
-            Head to the lounge
-          </button>
         </div>
+      </div>
+
+      <div className={`hud hud-bottom${expanded ? ' hud-hidden' : ''}`}>
+        <button className="btn btn-primary btn-big" onClick={onLeave}>
+          Head to the lounge
+        </button>
       </div>
 
       {showAgentPanel && isOwner && sessionToken && (

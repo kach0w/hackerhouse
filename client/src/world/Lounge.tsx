@@ -145,7 +145,7 @@ export function Lounge({ onStageReady, onGoToRoom }: Props) {
       )}
 
       <div className="hud hud-bottom">
-        <button className="btn btn-primary" onClick={() => onGoToRoom(selfId)}>
+        <button className="btn btn-primary btn-big" onClick={() => onGoToRoom(selfId)}>
           Head up to my room
         </button>
         {myRoom?.locked && <span className="hud-note">your door is locked</span>}

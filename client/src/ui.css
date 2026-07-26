@@ -100,6 +100,21 @@ body {
   background: #e5876a;
 }
 
+.btn-big {
+  font-size: 20px;
+  padding: 18px 32px;
+  box-shadow:
+    inset 3px 3px 0 rgba(255, 255, 255, 0.1),
+    inset -3px -3px 0 rgba(0, 0, 0, 0.4),
+    5px 5px 0 rgba(0, 0, 0, 0.35);
+}
+
+.btn-big:active:not(:disabled) {
+  box-shadow:
+    inset -3px -3px 0 rgba(255, 255, 255, 0.1),
+    inset 3px 3px 0 rgba(0, 0, 0, 0.4);
+}
+
 .btn-icon {
   padding: 7px 10px;
   font-size: 14px;
