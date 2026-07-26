@@ -5,6 +5,8 @@ import { fileURLToPath } from 'node:url';
 
 // server/src/terminal/agent-routes.ts is right next to the three files it serves.
 const DIR = path.dirname(fileURLToPath(import.meta.url));
+// -> repo root, where .claude/hooks/ lives.
+const REPO_ROOT = path.resolve(DIR, '../../..');
 
 /**
  * Serves the standalone local-agent bundle so install.sh can `curl` it down
@@ -25,6 +27,16 @@ export function createAgentRouter(): Router {
 
   router.get('/agent/package.json', (_req, res) => {
     res.type('application/json').send(fs.readFileSync(path.join(DIR, 'agent-package.json'), 'utf8'));
+  });
+
+  // Same Stop hook a host-spawned pty installs (pty.ts's ensureNotifyHook) —
+  // re-served rather than duplicated so there's one source of truth, and so
+  // a standalone agent's claude session fires agent:done exactly like a
+  // host-spawned one does.
+  router.get('/agent/notify-agent-done.sh', (_req, res) => {
+    res
+      .type('text/x-shellscript')
+      .send(fs.readFileSync(path.join(REPO_ROOT, '.claude/hooks/notify-agent-done.sh'), 'utf8'));
   });
 
   return router;
