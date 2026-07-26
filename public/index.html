@@ -6,7 +6,7 @@
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/xterm@5.3.0/css/xterm.css" />
   <style>
     body { margin: 0; background: #111; color: #eee; font-family: monospace; overflow: hidden; }
-    #bar { display: flex; gap: 8px; align-items: center; padding: 8px; background: #1a1a1a; }
+    #bar { display: flex; gap: 8px; align-items: center; padding: 8px; background: #1a1a1a; position: relative; z-index: 10; }
     #bar input { background: #222; color: #eee; border: 1px solid #444; padding: 4px 8px; }
     #bar button { background: #333; color: #eee; border: 1px solid #555; padding: 4px 10px; cursor: pointer; }
     #bar button:hover { background: #444; }
@@ -107,7 +107,10 @@
 
     document.getElementById("toRoomBtn").onclick = () => switchView(false);
     document.getElementById("doorToRoom").onclick = () => switchView(false);
-    document.getElementById("toLoungeBtn").onclick = () => switchView(true);
+    document.getElementById("toLoungeBtn").onclick = () => {
+      history.replaceState(null, "", location.pathname);
+      switchView(true);
+    };
 
     // ---------- terminal + room logic (unchanged) ----------
     const term = new Terminal({ convertEol: true, fontSize: 14, theme: { background: "#111" } });
