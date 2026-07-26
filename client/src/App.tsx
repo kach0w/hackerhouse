@@ -23,8 +23,17 @@ import { TransitionRunner, type Phase, type View } from './world/transitions';
 import './ui.css';
 
 function House() {
-  const { selfId, self, connected, usingMock, agentDone, clearAgentDone, enterRoom, leaveRoom } =
-    useSocket();
+  const {
+    selfId,
+    self,
+    connected,
+    usingMock,
+    httpBase,
+    agentDone,
+    clearAgentDone,
+    enterRoom,
+    leaveRoom,
+  } = useSocket();
 
   // Dev shortcut: `?view=room` boots straight into your room with the terminal
   // already down, so you can iterate on the Room without walking there each
@@ -123,9 +132,14 @@ function House() {
         />
       )}
 
-      {view === 'lounge' && (
+      {/*
+        Per D's request: voice room swaps are keyed off the `voiceRoom` prop
+        only — D remounts internally on change. We do NOT also fire a callback
+        from the transition state machine; one signal, as agreed.
+      */}
+      {view === 'lounge' && !usingMock && (
         <div className="hud hud-topright">
-          <VoiceControls channel="lounge" />
+          <VoiceControls identity={selfId} voiceRoom="lounge" serverHttpUrl={httpBase} />
         </div>
       )}
 

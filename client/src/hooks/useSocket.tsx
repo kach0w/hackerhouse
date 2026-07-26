@@ -20,7 +20,7 @@ import {
 } from 'react';
 import { io } from 'socket.io-client';
 
-import type { Facing, RoomState, User } from '../contract';
+import type { Facing, RoomState, User } from '@hackerhouse/shared';
 import { MockServer, type SocketLike } from '../mock/mockServer';
 
 /** Builder A throttles inbound moves; we throttle outbound to match (~18Hz). */
@@ -29,6 +29,11 @@ const MOVE_FLUSH_MS = 55;
 interface SocketApi {
   connected: boolean;
   usingMock: boolean;
+  /**
+   * Express base URL, passed to Builder C's <Terminal serverUrl> and Builder
+   * D's <VoiceControls serverHttpUrl>. Same origin as the socket connection.
+   */
+  httpBase: string;
   selfId: string;
   self: User | undefined;
   users: User[];
@@ -75,6 +80,7 @@ export function SocketProvider({ children }: { children: ReactNode }) {
 
   const serverUrl = import.meta.env.VITE_SERVER_URL as string | undefined;
   const usingMock = !serverUrl;
+  const httpBase = serverUrl ?? 'http://localhost:3001';
 
   // Outbound move throttle: buffer the latest position, flush on an interval.
   const pendingMove = useRef<{ x: number; y: number; facing: Facing } | null>(null);
@@ -148,6 +154,7 @@ export function SocketProvider({ children }: { children: ReactNode }) {
     return {
       connected,
       usingMock,
+      httpBase,
       selfId: identity.userId,
       self,
       users,
@@ -164,6 +171,7 @@ export function SocketProvider({ children }: { children: ReactNode }) {
   }, [
     connected,
     usingMock,
+    httpBase,
     identity.userId,
     users,
     rooms,

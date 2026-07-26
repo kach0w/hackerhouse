@@ -1,0 +1,28 @@
+{
+  "name": "@hackerhouse/server",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "tsx watch src/index.ts",
+    "verify": "PORT=3999 tsx src/state/verify.ts",
+    "verify:terminal": "PORT=3998 tsx src/terminal/verify.ts"
+  },
+  "dependencies": {
+    "@hackerhouse/shared": "*",
+    "cors": "^2.8.5",
+    "dotenv": "^16.4.0",
+    "express": "^4.21.2",
+    "livekit-server-sdk": "^2.17.0",
+    "node-pty": "^1.1.0",
+    "socket.io": "^4.8.1"
+  },
+  "devDependencies": {
+    "@types/cors": "^2.8.17",
+    "@types/express": "^5.0.0",
+    "@types/node": "^22.10.5",
+    "socket.io-client": "^4.8.1",
+    "tsx": "^4.19.2",
+    "typescript": "^5.7.2"
+  }
+}

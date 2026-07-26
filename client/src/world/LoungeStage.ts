@@ -14,7 +14,7 @@ import { Px } from '../art/PixelCanvas';
 import { METAL, OUTLINE, WALL, WOOD, shade } from '../art/palette';
 import { shadowSprite } from '../art/props';
 import { FLOOR_VARIANTS, baseboardTile, floorTile, wallTile, wallTopTile } from '../art/tiles';
-import type { User } from '../contract';
+import type { User } from '@hackerhouse/shared';
 import { Avatar, type Facing } from './Avatar';
 import { AmbientController } from './ambient';
 import {
@@ -59,6 +59,7 @@ export interface LoungeCallbacks {
 interface PeerTarget {
   x: number;
   y: number;
+  facing: Facing;
   still: number;
 }
 
@@ -204,7 +205,7 @@ export class LoungeStage {
         this.avatars.set(u.userId, av);
         this.sortLayer.addChild(av);
         av.position.set(u.x, u.y);
-        this.targets.set(u.userId, { x: u.x, y: u.y, still: 0 });
+        this.targets.set(u.userId, { x: u.x, y: u.y, facing: u.facing, still: 0 });
       }
       av.setName(u.name);
 
@@ -212,6 +213,7 @@ export class LoungeStage {
       const t = this.targets.get(u.userId)!;
       t.x = u.x;
       t.y = u.y;
+      t.facing = u.facing;
     }
 
     for (const [id, av] of this.avatars) {
@@ -293,16 +295,17 @@ export class LoungeStage {
       const nx = av.x + (t.x - av.x) * k;
       const ny = av.y + (t.y - av.y) * k;
       const step = Math.hypot(nx - av.x, ny - av.y);
-      const dx = t.x - av.x;
-      const dy = t.y - av.y;
 
       av.position.set(nx, ny);
 
-      // presence:update only carries x/y, so facing is inferred from motion.
+      // `facing` comes over the wire on presence:update (A threaded it through
+      // after spotting the handler was dropping it), so we render the peer's
+      // real direction rather than guessing it from interpolated motion.
+      av.setFacing(t.facing);
+
       if (step > 0.06) {
         t.still = 0;
         av.setWalking(true);
-        av.setFacing(facingFromDelta(dx, dy));
       } else {
         t.still += dt;
         if (t.still > 0.15) av.setWalking(false);

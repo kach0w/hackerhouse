@@ -261,90 +261,55 @@ body {
   padding: 2px 6px;
 }
 
-/* --- Terminal placeholder (Builder C replaces) ----------------------------- */
+/* --- Builder C's terminal -------------------------------------------------- */
 
-.terminal-stub {
+.terminal-pane .xterm {
   height: 100%;
-  display: flex;
-  flex-direction: column;
-  background: #0a0c11;
-}
-
-.terminal-stub-bar {
-  display: flex;
-  align-items: center;
-  gap: 10px;
   padding: 8px 12px;
-  background: #151922;
-  border-bottom: 1px solid #000;
 }
 
-.terminal-stub-dots {
-  display: flex;
-  gap: 5px;
-}
-
-.terminal-stub-dots i {
-  width: 10px;
-  height: 10px;
-  border-radius: 50%;
-  background: #39414f;
-}
-
-.terminal-stub-title {
-  font-size: 11px;
+/* Shown instead of C's terminal when there's no server to attach a PTY to. */
+.stub-pane {
+  height: 100%;
+  display: grid;
+  place-items: center;
+  padding: 40px;
+  text-align: center;
+  max-width: 46ch;
+  margin: 0 auto;
+  font-size: 12px;
+  line-height: 1.7;
   color: var(--muted);
 }
 
-.terminal-stub-body {
-  flex: 1;
-  margin: 0;
-  padding: 16px 20px;
-  font-size: 12.5px;
-  line-height: 1.6;
-  color: #b8c4d6;
-  overflow: auto;
-}
+/* --- Builder D's voice controls -------------------------------------------- */
 
-.terminal-stub-cursor {
-  animation: blink 1.1s steps(2, start) infinite;
-  color: var(--accent);
-}
-
-@keyframes blink {
-  to {
-    visibility: hidden;
-  }
-}
-
-.terminal-stub-note {
-  padding: 6px 20px 10px;
-  font-size: 10px;
-  color: #57617a;
-}
-
-/* --- Voice placeholder (Builder D replaces) -------------------------------- */
-
-.voice-stub {
+.voice-controls {
   display: inline-flex;
   align-items: center;
-  gap: 8px;
+  gap: 10px;
   background: var(--panel);
   border: 1px solid var(--edge);
   border-radius: 20px;
-  padding: 7px 13px;
+  padding: 6px 12px;
   font-size: 11px;
+  color: var(--text);
 }
 
-.voice-stub-dot {
-  width: 8px;
-  height: 8px;
-  border-radius: 50%;
-  background: #4ea86b;
+.voice-controls button {
+  font-family: var(--mono);
+  font-size: 11px;
+  color: var(--text);
+  background: rgba(40, 46, 60, 0.9);
+  border: 1px solid var(--edge);
+  border-radius: 5px;
+  padding: 4px 10px;
+  cursor: pointer;
 }
 
-.voice-stub-tag {
-  color: #57617a;
+.voice-controls--error {
+  color: #e8917f;
+  border-color: rgba(232, 145, 127, 0.35);
 }
 
 /* --- Agent-done messenger -------------------------------------------------- */

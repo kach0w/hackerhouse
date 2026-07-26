@@ -20,7 +20,7 @@ import {
   shadowSprite,
 } from '../art/props';
 import { FLOOR_VARIANTS, baseboardTile, floorTile, wallTile, wallTopTile } from '../art/tiles';
-import type { User } from '../contract';
+import type { User } from '@hackerhouse/shared';
 import { Avatar } from './Avatar';
 import {
   ARRIVE_EPS,

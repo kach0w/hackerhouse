@@ -18,7 +18,7 @@ import type {
   RoomState,
   ServerToClientEvents,
   User,
-} from '../contract';
+} from '@hackerhouse/shared';
 import { AmbientController } from '../world/ambient';
 import { LOUNGE_PX_W, clampToFloor } from '../world/layout';
 
@@ -63,6 +63,7 @@ export class MockServer implements SocketLike {
         state: 'lounge',
         x: 120 + i * 110,
         y: 150 + i * 45,
+        facing: 'down',
         roomId: null,
       });
       this.rooms.set(bot.userId, {
@@ -125,6 +126,7 @@ export class MockServer implements SocketLike {
       state: 'lounge',
       x: LOUNGE_PX_W / 2,
       y: 210,
+      facing: 'down',
       roomId: null,
     });
     if (!this.rooms.has(p.userId)) {
@@ -145,6 +147,7 @@ export class MockServer implements SocketLike {
     const { x, y } = clampToFloor(p.x, p.y);
     me.x = x;
     me.y = y;
+    me.facing = p.facing;
     this.broadcastPresence();
   }
 
@@ -203,6 +206,7 @@ export class MockServer implements SocketLike {
       if (out.x !== u.x || out.y !== u.y) moved = true;
       u.x = out.x;
       u.y = out.y;
+      u.facing = out.facing;
     }
     if (moved) this.broadcastPresence();
   }

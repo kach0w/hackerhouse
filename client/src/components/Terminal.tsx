@@ -1,63 +1,58 @@
-/**
- * ⚠️ PLACEHOLDER — Builder C owns this file. Overwrite it wholesale.
- *
- * Builder B depends on NOTHING here except the props signature below, which
- * comes straight from ENGINEERING_PLAN.md §"Builder C" step 3:
- *
- *     <Terminal roomId={string} mode={'owner' | 'visitor'} />
- *
- * Keep that signature and the Room scene keeps working. Everything else —
- * xterm instance, the /terminal namespace connection, resize handling — is
- * yours, and B will never reach into it.
- *
- * This stub just renders a fake terminal so the Room layout, the drop-down
- * animation, and the owner/visitor distinction are all demoable before the
- * real PTY lands.
- */
+import { useEffect, useRef } from 'react';
+import { io, type Socket } from 'socket.io-client';
+import { Terminal as XTerm } from '@xterm/xterm';
+import { FitAddon } from '@xterm/addon-fit';
+import '@xterm/xterm/css/xterm.css';
+import type { TerminalClientToServer, TerminalServerToClient } from '@hackerhouse/shared';
 
-interface Props {
+interface TerminalProps {
   roomId: string;
   mode: 'owner' | 'visitor';
+  userId: string;
+  serverUrl: string; // e.g. http://localhost:3001
 }
 
-const FAKE_LINES = [
-  '$ claude',
-  '',
-  '╭─────────────────────────────────────────────╮',
-  '│  ✻ Welcome to Claude Code                   │',
-  '╰─────────────────────────────────────────────╯',
-  '',
-  '> refactor the transition state machine',
-  '',
-  '● Read(src/world/transitions.ts)',
-  '  ⎿  Read 84 lines',
-  '',
-  '● Update(src/world/transitions.ts)',
-  '  ⎿  Added 12 lines, removed 5 lines',
-  '',
-  '  Waiting on the agent…',
-];
+export function Terminal({ roomId, mode, userId, serverUrl }: TerminalProps) {
+  const containerRef = useRef<HTMLDivElement>(null);
 
-export function Terminal({ roomId, mode }: Props) {
-  return (
-    <div className="terminal-stub">
-      <div className="terminal-stub-bar">
-        <span className="terminal-stub-dots">
-          <i />
-          <i />
-          <i />
-        </span>
-        <span className="terminal-stub-title">
-          {mode === 'visitor' ? `watching ${roomId} — read only` : 'claude code'}
-        </span>
-      </div>
-      <pre className="terminal-stub-body">
-        {FAKE_LINES.join('\n')}
-        {mode === 'owner' && <span className="terminal-stub-cursor">▊</span>}
-      </pre>
-      <div className="terminal-stub-note">
-        placeholder — Builder C replaces this file with the real xterm.js view
-      </div>
-    </div>
-  );
+  useEffect(() => {
+    const term = new XTerm({ convertEol: true, fontSize: 14, theme: { background: '#111' } });
+    const fitAddon = new FitAddon();
+    term.loadAddon(fitAddon);
+    if (containerRef.current) term.open(containerRef.current);
+    fitAddon.fit();
+
+    const socket: Socket<TerminalServerToClient, TerminalClientToServer> = io(
+      `${serverUrl}/terminal`,
+      { auth: { userId } }
+    );
+
+    socket.on('connect', () => {
+      socket.emit('terminal:join', { roomId, role: mode });
+    });
+
+    socket.on('terminal:output', ({ data }) => term.write(data));
+
+    if (mode === 'owner') {
+      term.onData((data) => socket.emit('terminal:input', { roomId, data }));
+    }
+    // visitor mode: no input handler attached at all, belt-and-suspenders
+    // on top of the server-side enforcement, which is the real boundary.
+
+    const handleResize = () => {
+      fitAddon.fit();
+      if (mode === 'owner') {
+        socket.emit('terminal:resize', { roomId, cols: term.cols, rows: term.rows });
+      }
+    };
+    window.addEventListener('resize', handleResize);
+
+    return () => {
+      window.removeEventListener('resize', handleResize);
+      socket.disconnect();
+      term.dispose();
+    };
+  }, [roomId, mode, userId, serverUrl]);
+
+  return <div ref={containerRef} style={{ width: '100%', height: '100%' }} />;
 }

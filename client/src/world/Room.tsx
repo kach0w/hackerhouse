@@ -34,7 +34,7 @@ export function Room({
 }: Props) {
   const hostRef = useRef<HTMLDivElement>(null);
   const stageRef = useRef<RoomStage | null>(null);
-  const { selfId, users, rooms, setLocked } = useSocket();
+  const { selfId, users, rooms, setLocked, httpBase, usingMock } = useSocket();
 
   const isOwner = roomId === selfId;
   const room = rooms.get(roomId);
@@ -94,7 +94,19 @@ export function Room({
   return (
     <div className={`scene room-scene${expanded ? ' is-expanded' : ''}`}>
       <div className={`terminal-pane${terminalVisible ? ' is-in' : ''}`}>
-        <Terminal roomId={roomId} mode={isOwner ? 'owner' : 'visitor'} />
+        {usingMock ? (
+          <div className="stub-pane">
+            no VITE_SERVER_URL — running against the in-browser mock, so there's no
+            PTY to attach to. Point at Builder A&apos;s server to get a real terminal.
+          </div>
+        ) : (
+          <Terminal
+            roomId={roomId}
+            mode={isOwner ? 'owner' : 'visitor'}
+            userId={selfId}
+            serverUrl={httpBase}
+          />
+        )}
       </div>
 
       <div className="room-pane">
@@ -114,7 +126,13 @@ export function Room({
           </div>
 
           <div className="room-bar-right">
-            <VoiceControls channel={`room-${roomId}`} />
+            {!usingMock && (
+              <VoiceControls
+                identity={selfId}
+                voiceRoom={`room-${roomId}`}
+                serverHttpUrl={httpBase}
+              />
+            )}
 
             {isOwner && (
               <button

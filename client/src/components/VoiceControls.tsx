@@ -1,31 +1,139 @@
 /**
- * ⚠️ PLACEHOLDER — Builder D owns this file. Overwrite it wholesale.
+ * Builder D — black-box voice UI for Builder B to mount.
  *
- * Builder B mounts this in both the Lounge and the Room and passes the channel
- * the user should currently be connected to:
+ * Props contract (do not reach into internals):
+ *   identity      — current user's userId
+ *   voiceRoom     — "lounge" | `room-${roomId}`
+ *   serverHttpUrl — Express base, e.g. http://localhost:3001
  *
- *     <VoiceControls channel="lounge" />
- *     <VoiceControls channel={`room-${roomId}`} />
+ * Room swaps: pass a new `voiceRoom` when presence.state changes (B can derive
+ * from A's presence:update). This component tears down the old LiveKitRoom
+ * and connects to the new one via React key — never two rooms at once.
  *
- * That prop is B's answer to coordination point #4 in the engineering plan:
- * rather than VoiceControls subscribing to presence or reaching into B's
- * transition state machine, B tells it which room to be in and re-renders it on
- * every Lounge↔Room transition. One signal, one direction, no shared state.
- *
- * D: keep the prop, do the connect/disconnect internally, and the swap happens
- * for free.
+ * Requires client deps (see CROSSTALK.md Builder D pins):
+ *   @livekit/components-react, @livekit/components-styles, livekit-client
  */
+import { useEffect, useState } from 'react';
+import {
+  LiveKitRoom,
+  RoomAudioRenderer,
+  useParticipants,
+  useLocalParticipant,
+} from '@livekit/components-react';
+import '@livekit/components-styles';
 
-interface Props {
-  channel: string;
+export interface VoiceControlsProps {
+  identity: string;
+  voiceRoom: string;
+  serverHttpUrl: string;
 }
 
-export function VoiceControls({ channel }: Props) {
+type TokenPayload = { token: string; url: string };
+
+async function fetchVoiceToken(
+  serverHttpUrl: string,
+  identity: string,
+  room: string,
+): Promise<TokenPayload> {
+  const res = await fetch(`${serverHttpUrl.replace(/\/$/, '')}/voice/token`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ identity, room }),
+  });
+  if (!res.ok) {
+    const body = await res.text();
+    throw new Error(`voice token failed (${res.status}): ${body}`);
+  }
+  return res.json() as Promise<TokenPayload>;
+}
+
+function MuteToggle() {
+  const { localParticipant } = useLocalParticipant();
+  const muted = localParticipant?.isMicrophoneEnabled === false;
+
   return (
-    <div className="voice-stub" title="placeholder — Builder D wires LiveKit here">
-      <span className="voice-stub-dot" />
-      <span className="voice-stub-label">{channel}</span>
-      <span className="voice-stub-tag">voice stub</span>
-    </div>
+    <button
+      type="button"
+      onClick={() => {
+        void localParticipant?.setMicrophoneEnabled(muted);
+      }}
+      aria-pressed={muted}
+    >
+      {muted ? 'Unmute' : 'Mute'}
+    </button>
   );
 }
+
+function PeerCount() {
+  const participants = useParticipants();
+  // includes local
+  return <span>{participants.length} in voice</span>;
+}
+
+function VoiceSession({
+  token,
+  url,
+}: {
+  token: string;
+  url: string;
+}) {
+  return (
+    <LiveKitRoom
+      token={token}
+      serverUrl={url}
+      connect
+      audio
+      video={false}
+      style={{ display: 'contents' }}
+    >
+      <RoomAudioRenderer />
+      <div className="voice-controls">
+        <MuteToggle />
+        <PeerCount />
+      </div>
+    </LiveKitRoom>
+  );
+}
+
+export function VoiceControls({ identity, voiceRoom, serverHttpUrl }: VoiceControlsProps) {
+  const [creds, setCreds] = useState<TokenPayload | null>(null);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    setCreds(null);
+    setError(null);
+
+    fetchVoiceToken(serverHttpUrl, identity, voiceRoom)
+      .then((payload) => {
+        if (!cancelled) setCreds(payload);
+      })
+      .catch((err: unknown) => {
+        if (!cancelled) {
+          setError(err instanceof Error ? err.message : String(err));
+        }
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [identity, voiceRoom, serverHttpUrl]);
+
+  if (error) {
+    return <div className="voice-controls voice-controls--error">Voice: {error}</div>;
+  }
+  if (!creds) {
+    return <div className="voice-controls">Voice connecting…</div>;
+  }
+
+  // key forces full remount on lounge↔room swap (one LiveKit room at a time)
+  return (
+    <VoiceSession
+      key={`${identity}:${voiceRoom}`}
+      token={creds.token}
+      url={creds.url}
+    />
+  );
+}
+
+export default VoiceControls;
