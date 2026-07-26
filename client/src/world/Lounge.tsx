@@ -26,6 +26,14 @@ export function Lounge({ onStageReady, onGoToRoom }: Props) {
   const stageRef = useRef<LoungeStage | null>(null);
   const { selfId, self, users, loungeUsers, rooms, sendMove, deniedRoomId } = useSocket();
 
+  // Owners currently heads-down at their own desk — their avatar isn't in the
+  // lounge scene at all while they're in there, so this is the only way to
+  // find and visit them. `roomId === userId` picks out the owner, not a
+  // visitor riding along in someone else's room.
+  const inRoomUsers = users.filter(
+    (u) => u.state === 'room' && u.roomId === u.userId && u.userId !== selfId,
+  );
+
   const [selected, setSelected] = useState<string | null>(null);
   const [toast, setToast] = useState<string | null>(null);
   /** Which minigame overlay is open, if any. Driven by clicking a station. */
@@ -105,6 +113,29 @@ export function Lounge({ onStageReady, onGoToRoom }: Props) {
         <div className="hud-title">THE LOUNGE</div>
         <div className="hud-sub">{loungeUsers.length} building tonight</div>
       </div>
+
+      {inRoomUsers.length > 0 && (
+        <div className="hud hud-left">
+          <div className="room-roster-label">in their room</div>
+          <div className="room-roster">
+            {inRoomUsers.map((u) => {
+              const locked = rooms.get(u.userId)?.locked;
+              return (
+                <button
+                  key={u.userId}
+                  className="room-roster-item"
+                  disabled={locked}
+                  title={locked ? `${u.name}'s door is locked` : `Visit ${u.name}'s room`}
+                  onClick={() => onGoToRoom(u.userId)}
+                >
+                  <span className="room-roster-name">{u.name}</span>
+                  <span className="room-roster-status">{locked ? '🔒' : 'visit →'}</span>
+                </button>
+              );
+            })}
+          </div>
+        </div>
+      )}
 
       <div className="hud hud-bottom">
         <button className="btn btn-primary" onClick={() => onGoToRoom(selfId)}>

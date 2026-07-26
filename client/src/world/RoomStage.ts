@@ -348,10 +348,16 @@ export class RoomStage {
     // --- Floor furniture ----------------------------------------------------
     // Kept close to centre: at the zoom the monitor demands, only about ±240
     // native px either side of the desk is on screen at 1440 wide.
-    add(bed(), ROOM_CX - 232, 196, Z.furniture, { shadowY: 254 });
+    // In the gap between the monitor's right edge and the bookshelf — well
+    // clear of the door, which a previous zoom tune accidentally pulled the
+    // bed on top of.
+    // Far left — to the LEFT of the door itself, framing it, not squeezed
+    // into the gap on its right. Resting forward on the open floor at the
+    // same depth as the plants, not up against the back wall like the
+    // bookshelf.
+    add(bed(), ROOM_DOOR.x - 130, 282, Z.furniture + 40, { shadowY: 338 });
     add(bookshelf(), ROOM_CX + 196, 208, Z.furniture, { shadowY: 258 });
     add(plant(), ROOM_CX + 166, 296, Z.furniture + 40, { shadowY: 330 });
-    add(plant(), ROOM_CX - 172, 302, Z.furniture + 40, { shadowY: 336 });
 
     // --- The desk setup -----------------------------------------------------
     add(deskSlab(DESK_TOP.w, DESK_TOP.h), DESK_TOP.x, DESK_TOP.y, Z.desk, { shadowY: 306 });
