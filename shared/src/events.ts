@@ -2,7 +2,10 @@ import type { User, RoomState, Facing, JukeboxState, JukeboxTrack } from './type
 
 // ---- Client -> Server (main namespace) ----
 export interface ClientToServerEvents {
-  join: (payload: { userId: string; name: string }) => void;
+  // `token` is optional so a first-time visitor can still claim a fresh
+  // `userId`; if present and valid it's the authoritative identity (the
+  // client-supplied `userId` is ignored in that case). See join:ok below.
+  join: (payload: { userId: string; name: string; token?: string }) => void;
   move: (payload: { x: number; y: number; facing: Facing }) => void;
   'room:enter': (payload: { roomId: string }) => void;
   'room:leave': (payload: { roomId: string }) => void;
@@ -17,6 +20,11 @@ export interface ServerToClientEvents {
   'room:enter:denied': (payload: { roomId: string; reason: 'locked' }) => void;
   'agent:done': (payload: { userId: string; roomId: string }) => void;
   'jukebox:state': (payload: JukeboxState) => void;
+  // Signed session token minted (or reconfirmed) on join. Persist it
+  // client-side (e.g. localStorage) and send it back as `join`'s `token` on
+  // reconnect, and on the `/terminal` handshake and `/notify`, instead of a
+  // bare claimed userId. See server/src/state/socket.ts `verifySession`.
+  'join:ok': (payload: { userId: string; token: string }) => void;
 }
 
 // ---- Terminal namespace ("/terminal") ----

@@ -7,6 +7,7 @@ import '../index.js';
 
 const PORT = process.env.PORT ?? '3999';
 const URL = `http://localhost:${PORT}`;
+const GRACE_MS = Number(process.env.DISCONNECT_GRACE_MS) || 30_000;
 
 let failed = false;
 
@@ -26,6 +27,21 @@ function connect(userId: string, name: string): Promise<ClientSocket> {
       socket.emit('join', { userId, name });
       resolve(socket);
     });
+  });
+}
+
+/** Like `connect`, but also captures the session token from `join:ok`. */
+function connectAndJoin(
+  userId: string,
+  name: string,
+  token?: string,
+): Promise<{ socket: ClientSocket; userId: string; token: string }> {
+  const socket = ioClient(URL, { transports: ['websocket'] });
+  return new Promise((resolve) => {
+    socket.on('join:ok', (payload: { userId: string; token: string }) =>
+      resolve({ socket, userId: payload.userId, token: payload.token }),
+    );
+    socket.on('connect', () => socket.emit('join', { userId, name, token }));
   });
 }
 
@@ -57,16 +73,14 @@ async function main() {
   const b = await connect('userB', 'Bob');
 
   console.log('Test: join -> presence:update with both users');
-  const presenceA = await waitFor<{ users: { userId: string }[] }>(
-    a,
-    'presence:update',
-    (p) => p.users.length >= 2,
-  );
-  const presenceB = await waitFor<{ users: { userId: string }[] }>(
-    b,
-    'presence:update',
-    (p) => p.users.length >= 2,
-  );
+  // Register both listeners up front (Promise.all) rather than sequential
+  // awaits — B's join can complete and broadcast before a listener is ever
+  // attached to B's socket if we wait on A first, dropping the event B
+  // needed and hanging this test.
+  const [presenceA, presenceB] = await Promise.all([
+    waitFor<{ users: { userId: string }[] }>(a, 'presence:update', (p) => p.users.length >= 2),
+    waitFor<{ users: { userId: string }[] }>(b, 'presence:update', (p) => p.users.length >= 2),
+  ]);
   check('A sees both users', presenceA.users.some((u) => u.userId === 'userA') && presenceA.users.some((u) => u.userId === 'userB'));
   check('B sees both users', presenceB.users.some((u) => u.userId === 'userA') && presenceB.users.some((u) => u.userId === 'userB'));
 
@@ -149,6 +163,71 @@ async function main() {
     afterStaleDisconnect.users.some((u) => u.userId === 'userD' && u.x === 99),
   );
   d2.disconnect();
+
+  console.log('Test: join:ok mints a session token; a valid token on reconnect wins over a mismatched claimed userId');
+  const erin1 = await connectAndJoin('userE', 'Erin');
+  check(
+    'join:ok returns a non-empty token bound to the claimed userId',
+    erin1.userId === 'userE' && typeof erin1.token === 'string' && erin1.token.length > 0,
+  );
+  erin1.socket.disconnect();
+  await new Promise((resolve) => setTimeout(resolve, 50));
+  const erin2 = await connectAndJoin('someone-else', 'Erin (reconnect)', erin1.token);
+  check("a valid token overrides a mismatched claimed userId on reconnect", erin2.userId === 'userE');
+  erin2.socket.disconnect();
+
+  console.log('Test: an invalid token falls back to a fresh identity instead of erroring');
+  const frank = await connectAndJoin('userF', 'Frank', 'not-a-real-token');
+  check('a garbage token does not block a fresh join', frank.userId === 'userF');
+  frank.socket.disconnect();
+
+  console.log('Test: disconnect grace period preserves position, and a token reconnect within it cancels the sweep');
+  const owner1 = await connectAndJoin('userOwner', 'Owner');
+  owner1.socket.emit('move', { x: 55, y: 66, facing: 'left' });
+  await waitFor<{ users: { userId: string; x: number }[] }>(
+    c,
+    'presence:update',
+    (p) => p.users.find((u) => u.userId === 'userOwner')?.x === 55,
+  );
+  const visitor = await connectAndJoin('userVisitor', 'Visitor');
+  const visitorEntered = waitFor<{ roomId: string; occupants: string[] }>(
+    visitor.socket,
+    'room:update',
+    (r) => r.roomId === 'userOwner' && r.occupants.includes('userVisitor'),
+  );
+  visitor.socket.emit('room:enter', { roomId: 'userOwner' });
+  await visitorEntered;
+
+  owner1.socket.disconnect();
+  await new Promise((resolve) => setTimeout(resolve, Math.min(GRACE_MS / 2, 200)));
+  const owner2 = await connectAndJoin('userOwner', 'Owner', owner1.token);
+  const ownerReconnectPresence = await waitFor<{ users: { userId: string; x: number; y: number }[] }>(
+    owner2.socket,
+    'presence:update',
+    (p) => p.users.some((u) => u.userId === 'userOwner'),
+  );
+  const ownerAfterReconnect = ownerReconnectPresence.users.find((u) => u.userId === 'userOwner');
+  check(
+    'reconnecting within the grace period restores the exact x/y the owner had before disconnecting',
+    ownerAfterReconnect?.x === 55 && ownerAfterReconnect?.y === 66,
+  );
+
+  console.log("Test: room GC — an owner swept after the grace period expires has their room torn down, occupants sent to the lounge");
+  owner2.socket.disconnect();
+  const visitorSentHome = waitFor<{ users: { userId: string; state: string; roomId: string | null }[] }>(
+    visitor.socket,
+    'presence:update',
+    (p) => p.users.find((u) => u.userId === 'userVisitor')?.roomId === null,
+    GRACE_MS + 2000,
+  );
+  await new Promise((resolve) => setTimeout(resolve, GRACE_MS + 300));
+  const visitorHome = await visitorSentHome;
+  const visitorState = visitorHome.users.find((u) => u.userId === 'userVisitor');
+  check(
+    "visitor is sent back to the lounge once the swept owner's room is GC'd",
+    visitorState?.state === 'lounge' && visitorState?.roomId === null,
+  );
+  visitor.socket.disconnect();
 
   a.disconnect();
   b.disconnect();
