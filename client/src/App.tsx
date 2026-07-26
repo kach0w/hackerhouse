@@ -8,7 +8,7 @@
  * local state and tell the server at the right moment.
  */
 
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState, type FormEvent } from 'react';
 import gsap from 'gsap';
 
 import { Jukebox } from './components/Jukebox';
@@ -37,6 +37,7 @@ function House() {
     leaveRoom,
     jukebox,
     skipTrack,
+    users,
   } = useSocket();
 
   // Dev shortcut: `?view=room` boots straight into your room with the terminal
@@ -119,6 +120,18 @@ function House() {
     enterRoom(selfId);
   }, [bootView, self, selfId, enterRoom]);
 
+  // Visitors don't own the room they're standing in — if the owner heads back
+  // to the lounge, staying behind means watching an empty desk. Follow them
+  // out automatically. `goToLounge` is a no-op while another transition is
+  // already running, so this can't double-fire mid-animation.
+  useEffect(() => {
+    if (view !== 'room' || !activeRoomId || activeRoomId === selfId) return;
+    const owner = users.find((u) => u.userId === activeRoomId);
+    if (owner && owner.state !== 'room') {
+      goToLounge();
+    }
+  }, [view, activeRoomId, selfId, users, goToLounge]);
+
   const showMessenger = view === 'lounge' && !!agentDone && phase === 'idle';
 
   return (
@@ -172,7 +185,64 @@ function House() {
   );
 }
 
+/**
+ * First-visit name entry. `?name=` still works as a bypass (fake test users,
+ * bot scripts), and a returning browser skips straight past this since
+ * `useSocket`'s identity is the same localStorage key — set it here once and
+ * `resolveIdentity` picks it up when SocketProvider mounts.
+ */
+function NameGate({ onSubmit }: { onSubmit: (name: string) => void }) {
+  const [value, setValue] = useState('');
+
+  const submit = (e: FormEvent) => {
+    e.preventDefault();
+    const trimmed = value.trim();
+    if (!trimmed) return;
+    onSubmit(trimmed);
+  };
+
+  return (
+    <div className="name-gate">
+      <form className="name-gate-panel" onSubmit={submit}>
+        <div className="name-gate-title">HACKER HOUSE</div>
+        <p className="name-gate-sub">What should we call you?</p>
+        <input
+          className="name-gate-input"
+          value={value}
+          onChange={(e) => setValue(e.target.value)}
+          placeholder="your name"
+          maxLength={24}
+          autoFocus
+        />
+        <button className="btn btn-primary" type="submit" disabled={!value.trim()}>
+          Join the house
+        </button>
+      </form>
+    </div>
+  );
+}
+
+function useStoredName(): [string | null, (name: string) => void] {
+  const [name, setNameState] = useState<string | null>(() => {
+    const fromQuery = new URLSearchParams(window.location.search).get('name');
+    return fromQuery ?? localStorage.getItem('hh.name');
+  });
+
+  const setName = useCallback((n: string) => {
+    localStorage.setItem('hh.name', n);
+    setNameState(n);
+  }, []);
+
+  return [name, setName];
+}
+
 export default function App() {
+  const [name, setName] = useStoredName();
+
+  if (!name) {
+    return <NameGate onSubmit={setName} />;
+  }
+
   return (
     <SocketProvider>
       <House />

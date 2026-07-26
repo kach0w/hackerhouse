@@ -38,6 +38,7 @@ export function Room({
   onToggleExpanded,
 }: Props) {
   const hostRef = useRef<HTMLDivElement>(null);
+  const sceneRef = useRef<HTMLDivElement>(null);
   const stageRef = useRef<RoomStage | null>(null);
   const { selfId, users, rooms, setLocked, httpBase, usingMock } = useSocket();
 
@@ -53,6 +54,30 @@ export function Room({
   latest.current = { users, selfId, roomId };
 
   const onLayout = useCallback((rect: ScreenRect) => setScreen(rect), []);
+
+  // The existing "expand" toggle only fills the browser tab's viewport — it
+  // doesn't hide browser chrome. Requesting real Fullscreen API alongside it
+  // gets an actual OS-level fullscreen terminal. Esc exits fullscreen outside
+  // our control, so `fullscreenchange` is what keeps `expanded` in sync then.
+  const toggleFullscreen = useCallback(() => {
+    // Fullscreen can be denied (embedded contexts, permissions policy, some
+    // browsers) — that's fine, the CSS fill-viewport toggle below still
+    // works as a fallback either way, so failures here are silent.
+    if (document.fullscreenElement) {
+      document.exitFullscreen().catch(() => {});
+    } else {
+      sceneRef.current?.requestFullscreen().catch(() => {});
+    }
+    onToggleExpanded();
+  }, [onToggleExpanded]);
+
+  useEffect(() => {
+    const onChange = () => {
+      if (!document.fullscreenElement && expanded) onToggleExpanded();
+    };
+    document.addEventListener('fullscreenchange', onChange);
+    return () => document.removeEventListener('fullscreenchange', onChange);
+  }, [expanded, onToggleExpanded]);
 
   // Builder C's Terminal refits xterm on `window.resize`. Our glass rect can
   // change without the window changing (first layout, expand toggle), and a
@@ -125,7 +150,7 @@ export function Room({
       : { display: 'none' };
 
   return (
-    <div className={`scene room-scene${expanded ? ' is-expanded' : ''}`}>
+    <div className={`scene room-scene${expanded ? ' is-expanded' : ''}`} ref={sceneRef}>
       <div className="canvas-host" ref={hostRef} />
 
       <div
@@ -151,6 +176,14 @@ export function Room({
             />
           )
         )}
+
+        <button
+          className="monitor-fullscreen-btn"
+          title={expanded ? 'Exit fullscreen' : 'Fullscreen the terminal'}
+          onClick={toggleFullscreen}
+        >
+          {expanded ? '🗗' : '⛶'}
+        </button>
       </div>
 
       <div className="room-bar">
@@ -187,10 +220,10 @@ export function Room({
 
           <button
             className="btn btn-icon"
-            title={expanded ? 'Back to the room' : 'Fill the screen with the terminal'}
-            onClick={onToggleExpanded}
+            title={expanded ? 'Exit fullscreen' : 'Fullscreen the terminal'}
+            onClick={toggleFullscreen}
           >
-            {expanded ? '🗗' : '🗖'}
+            {expanded ? '🗗' : '⛶'}
           </button>
 
           <button className="btn btn-primary" onClick={onLeave}>
