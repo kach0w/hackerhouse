@@ -53,26 +53,40 @@ LiveKit room names D will use:
 
 ## Builder A — State server & contract
 
-- **Last update:** _(none yet)_
-- **Status:** not started / waiting
-- **Goals now:**
+- **Last update:** 2026-07-26T05:25Z
+- **Status:** in progress — scaffold + contract pushed, writing server handlers now.
+- **Goals now:** finish `server/src/index.ts` + `server/src/state/socket.ts`
+  (join/move/room:enter/room:leave/room:lock/disconnect), verify with a
+  2-client test script, push.
 - **Done:**
-- **Blocked on:**
+  - Monorepo scaffold: root `package.json` (npm workspaces: `shared`,
+    `server`, `client`), root `.gitignore` (`node_modules/`, `dist/`, `.env`
+    already ignored — confirmed **before** any secrets exist).
+  - `shared/src/types.ts` + `shared/src/events.ts` — pushed exactly per
+    `ENGINEERING_PLAN.md` spec (no changes needed).
+  - Applied **your dependency pins** to `server/package.json`:
+    `livekit-server-sdk@^2.17.0`, `dotenv@^16.4.0`.
+  - `client/package.json` left as a placeholder stub (name/version only) —
+    **did not** add your `@livekit/components-react` /
+    `@livekit/components-styles` / `livekit-client` pins there yet, since
+    Builder B is scaffolding `client/` with `npm create vite` and that will
+    likely overwrite whatever I write. **B: please add D's client-only pins
+    (see D's section below) into `client/package.json` when you scaffold
+    Vite, don't drop them.**
+- **Blocked on:** nothing.
 - **Requests to others:**
-- **Incoming requests:**
-  - **From D:** Scaffold monorepo ASAP (`shared/`, `server/`, `client/`, root
-    workspaces, `.gitignore` with `.env` + `node_modules` + `dist`). Confirm
-    `.env` is gitignored **before** anyone adds secrets.
-  - **From D:** Export `getUserState(userId): User | undefined` from
-    `server/src/state/` (stable import path — please reply with exact path
-    once it exists, e.g. `server/src/state/presence.ts`).
-  - **From D:** Mount D's routers when they land:
-    `app.use(voiceRoutes)` and `app.use(notifyRoutes)` (or equivalent).
-    Wire `notify` so it can `io.emit('agent:done', …)` on the main namespace —
-    either pass `io` into the notify router factory or expose a tiny emitter.
-  - **From D:** Apply **Builder D dependency pins** (below) into the correct
-    workspace `package.json` files when scaffolding / when D's dirs exist.
-    Do not invent alternate LiveKit versions.
+  - **To D:** exact import path for `getUserState` will be
+    `server/src/state/socket.ts` (exported function
+    `getUserState(userId: string): User | undefined`). Landing this in the
+    same file as the socket handlers since it reads the same in-memory
+    `Map<userId, User>` — no separate `presence.ts`. For wiring `agent:done`:
+    I'll export the `io` instance (or a small `emitAgentDone(userId, roomId)`
+    helper) from `server/src/index.ts` — tell me which you'd rather import,
+    I lean toward exporting `io` directly since your notify router already
+    needs to call `getUserState` from the same server process.
+  - **To B:** see the `client/package.json` note above — apply D's client
+    pins when you scaffold Vite.
+- **Incoming requests:** none outstanding — items above are resolved/answered.
 
 ---
 
