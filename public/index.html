@@ -1,0 +1,217 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8" />
+  <title>hacker house — scaffold</title>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/xterm@5.3.0/css/xterm.css" />
+  <style>
+    body { margin: 0; background: #111; color: #eee; font-family: monospace; overflow: hidden; }
+    #bar { display: flex; gap: 8px; align-items: center; padding: 8px; background: #1a1a1a; }
+    #bar input { background: #222; color: #eee; border: 1px solid #444; padding: 4px 8px; }
+    #bar button { background: #333; color: #eee; border: 1px solid #555; padding: 4px 10px; cursor: pointer; }
+    #bar button:hover { background: #444; }
+    #status { margin-left: auto; opacity: 0.7; }
+    #terminal { padding: 8px; }
+    #links { padding: 0 8px; font-size: 12px; opacity: 0.8; }
+    #links a { color: #7cf; }
+
+    .view { display: none; }
+    .view.active { display: block; }
+
+    /* --- Lounge (placeholder) --- */
+    #loungeView { height: calc(100vh - 41px); position: relative; background: #1e2a1e; }
+    #loungeView .floor {
+      position: absolute; inset: 0;
+      background-image:
+        linear-gradient(#2a3a2a 1px, transparent 1px),
+        linear-gradient(90deg, #2a3a2a 1px, transparent 1px);
+      background-size: 40px 40px;
+    }
+    .avatar {
+      position: absolute; width: 32px; height: 32px; border-radius: 6px;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 11px; color: #111; font-weight: bold;
+      box-shadow: 0 2px 6px rgba(0,0,0,0.4);
+    }
+    .avatar .label {
+      position: absolute; top: -18px; left: 50%; transform: translateX(-50%);
+      font-size: 10px; color: #eee; white-space: nowrap;
+    }
+    #meAvatar { background: #7cf; }
+    #other1 { background: #f97; }
+    #other2 { background: #fc7; }
+    .door {
+      position: absolute; width: 60px; height: 40px; border: 2px dashed #6a6;
+      border-radius: 4px; display: flex; align-items: center; justify-content: center;
+      font-size: 11px; color: #9d9; cursor: pointer;
+    }
+    .door:hover { background: rgba(100,200,100,0.1); }
+
+    /* --- fade overlay for transitions --- */
+    #fade {
+      position: fixed; inset: 0; background: #000; opacity: 0;
+      pointer-events: none; transition: opacity 0.4s ease; z-index: 999;
+    }
+    #fade.active { opacity: 1; pointer-events: all; }
+  </style>
+</head>
+<body>
+  <div id="fade"></div>
+
+  <!-- LOUNGE VIEW -->
+  <div id="loungeView" class="view active">
+    <div id="bar">
+      <strong>the lounge</strong>
+      <button id="toRoomBtn">walk to your room →</button>
+      <span id="status">2 others here (placeholder)</span>
+    </div>
+    <div class="floor"></div>
+    <div class="avatar" id="meAvatar" style="left: 300px; top: 200px;"><span class="label">you</span>me</div>
+    <div class="avatar" id="other1" style="left: 150px; top: 120px;"><span class="label">alex</span>a</div>
+    <div class="avatar" id="other2" style="left: 450px; top: 300px;"><span class="label">sam</span>s</div>
+    <div class="door" style="left: 700px; top: 400px;" id="doorToRoom">stairs ↑</div>
+  </div>
+
+  <!-- ROOM VIEW -->
+  <div id="roomView" class="view">
+    <div id="bar">
+      <button id="toLoungeBtn">head to the lounge</button>
+      <button id="createBtn">create room</button>
+      <input id="joinId" placeholder="room id to join" />
+      <button id="joinBtn">join (read-only)</button>
+      <button id="lockBtn" disabled>lock room</button>
+      <button id="endBtn" disabled>end session</button>
+      <span id="roomStatus"></span>
+    </div>
+    <div id="links"></div>
+    <div id="terminal"></div>
+  </div>
+
+  <script src="https://cdn.jsdelivr.net/npm/xterm@5.3.0/lib/xterm.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/xterm-addon-fit@0.8.0/lib/xterm-addon-fit.js"></script>
+  <script>
+    // ---------- view switching (Lounge <-> Room) ----------
+    const loungeView = document.getElementById("loungeView");
+    const roomView = document.getElementById("roomView");
+    const fade = document.getElementById("fade");
+
+    function switchView(showLounge) {
+      fade.classList.add("active");
+      setTimeout(() => {
+        loungeView.classList.toggle("active", showLounge);
+        roomView.classList.toggle("active", !showLounge);
+        if (!showLounge) setTimeout(() => fitAddon.fit(), 50);
+        setTimeout(() => fade.classList.remove("active"), 50);
+      }, 400);
+    }
+
+    document.getElementById("toRoomBtn").onclick = () => switchView(false);
+    document.getElementById("doorToRoom").onclick = () => switchView(false);
+    document.getElementById("toLoungeBtn").onclick = () => switchView(true);
+
+    // ---------- terminal + room logic (unchanged) ----------
+    const term = new Terminal({ convertEol: true, fontSize: 14, theme: { background: "#111" } });
+    const fitAddon = new FitAddon.FitAddon();
+    term.loadAddon(fitAddon);
+    term.open(document.getElementById("terminal"));
+    fitAddon.fit();
+
+    const status = document.getElementById("roomStatus");
+    const links = document.getElementById("links");
+    const lockBtn = document.getElementById("lockBtn");
+    const endBtn = document.getElementById("endBtn");
+    let isOwner = false;
+    let locked = false;
+    let currentSessionId = null;
+
+    const ws = new WebSocket(`ws://${location.host}`);
+
+    ws.onmessage = (ev) => {
+      const msg = JSON.parse(ev.data);
+      switch (msg.type) {
+        case "rooms":
+          status.textContent = `${msg.rooms.length} room(s) live`;
+          break;
+        case "created": {
+          isOwner = true;
+          currentSessionId = msg.sessionId;
+          lockBtn.disabled = false;
+          endBtn.disabled = false;
+          status.textContent = `you own room ${msg.sessionId}`;
+          const ownerUrl = `${location.origin}?room=${msg.sessionId}&token=${msg.ownerToken}`;
+          const visitorUrl = `${location.origin}?room=${msg.sessionId}`;
+          links.innerHTML =
+            `owner link (keep private): <a href="${ownerUrl}">${ownerUrl}</a><br>` +
+            `visitor link (share): <a href="${visitorUrl}">${visitorUrl}</a>`;
+          history.replaceState(null, "", ownerUrl.replace(location.origin, ""));
+          break;
+        }
+        case "joined":
+          isOwner = !!msg.isOwner;
+          currentSessionId = msg.sessionId;
+          lockBtn.disabled = !isOwner;
+          endBtn.disabled = !isOwner;
+          status.textContent = isOwner
+            ? `reconnected as owner of room ${msg.sessionId}`
+            : `viewing room ${msg.sessionId} (read-only)`;
+          if (msg.buffer) term.write(msg.buffer);
+          switchView(false);
+          break;
+        case "output":
+          term.write(msg.data);
+          break;
+        case "kicked":
+          status.textContent = "room was locked — you were removed";
+          break;
+        case "exited":
+          status.textContent = "session ended";
+          break;
+        case "error":
+          status.textContent = `error: ${msg.message}`;
+          break;
+      }
+    };
+
+    document.getElementById("createBtn").onclick = () => {
+      ws.send(JSON.stringify({ type: "create" }));
+    };
+
+    document.getElementById("joinBtn").onclick = () => {
+      const id = document.getElementById("joinId").value.trim();
+      if (id) ws.send(JSON.stringify({ type: "join", sessionId: id }));
+    };
+
+    lockBtn.onclick = () => {
+      locked = !locked;
+      ws.send(JSON.stringify({ type: "lock", locked }));
+      lockBtn.textContent = locked ? "unlock room" : "lock room";
+    };
+
+    endBtn.onclick = () => {
+      if (confirm("End this session? This kills the terminal for everyone.")) {
+        ws.send(JSON.stringify({ type: "end" }));
+      }
+    };
+
+    term.onData((data) => {
+      if (isOwner) ws.send(JSON.stringify({ type: "input", data }));
+    });
+
+    window.addEventListener("resize", () => {
+      fitAddon.fit();
+      if (isOwner) {
+        ws.send(JSON.stringify({ type: "resize", cols: term.cols, rows: term.rows }));
+      }
+    });
+
+    // auto-join if URL has ?room= (and optionally ?token= to rejoin as owner)
+    const params = new URLSearchParams(location.search);
+    const roomParam = params.get("room");
+    const tokenParam = params.get("token");
+    if (roomParam) {
+      ws.onopen = () =>
+        ws.send(JSON.stringify({ type: "join", sessionId: roomParam, token: tokenParam }));
+    }
+  </script>
+</body>
+</html>
