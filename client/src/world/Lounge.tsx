@@ -48,7 +48,17 @@ export function Lounge({ onStageReady, onGoToRoom }: Props) {
   const latest = useRef({ users, selfId });
   latest.current = { users, selfId };
 
+  // Torn down and re-created around a minigame instead of just hidden: a
+  // minigame overlay spins up its own PixiJS Application (its own WebGL/WebGPU
+  // context), and leaving the lounge's context alive underneath is what caused
+  // the exit-to-blank-screen bug — a second live context could tip the browser
+  // over its GPU context budget and knock out the first one's rendering with
+  // no error to catch. Only ever having one Pixi Application live at a time
+  // sidesteps that entirely, and it's the same teardown/rebuild the Room
+  // transition already does, so re-entry looks identical to arriving fresh.
   useEffect(() => {
+    if (game) return;
+
     const host = hostRef.current;
     if (!host) return;
 
@@ -84,7 +94,7 @@ export function Lounge({ onStageReady, onGoToRoom }: Props) {
       stageRef.current?.destroy();
       stageRef.current = null;
     };
-  }, [onStageReady]);
+  }, [onStageReady, game]);
 
   useEffect(() => {
     stageRef.current?.syncUsers(users, selfId);
