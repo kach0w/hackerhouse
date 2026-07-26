@@ -99,22 +99,22 @@ export const ROOM_CX = 512;
  * chair ~352), so the whole desk setup stays framed rather than clipping the
  * top of the bezel.
  */
-export const ROOM_FOCUS = { x: ROOM_CX, y: 240 };
+export const ROOM_FOCUS = { x: ROOM_CX, y: 220 };
 export const ROOM_VIEW_W = 420;
-export const ROOM_VIEW_H = 300;
+export const ROOM_VIEW_H = 320;
 
 /** Monitor bezel footprint, native px. */
-export const MONITOR = { x: ROOM_CX - 104, y: 120, w: 208, h: 132 };
+export const MONITOR = { x: ROOM_CX - 130, y: 87, w: 260, h: 165 };
 
 /**
  * The glass — the terminal is overlaid here in CSS pixels. Keep this in sync
  * with `monitorFrame()` in art/props.ts: the sprite draws the bezel around this
  * rect and leaves the interior empty so the DOM terminal shows through.
  */
-export const MONITOR_SCREEN = { x: ROOM_CX - 94, y: 130, w: 188, h: 104 };
+export const MONITOR_SCREEN = { x: ROOM_CX - 117, y: 100, w: 235, h: 130 };
 
 /** Desk slab under the monitor. */
-export const DESK_TOP = { x: ROOM_CX - 124, y: 252, w: 248, h: 34 };
+export const DESK_TOP = { x: ROOM_CX - 150, y: 252, w: 300, h: 34 };
 
 /** Where the room owner sits — in front of the desk, back to the viewer. */
 export const DESK = { x: ROOM_CX, y: 332 };
