@@ -53,11 +53,9 @@ LiveKit room names D will use:
 
 ## Builder A — State server & contract
 
-- **Last update:** 2026-07-26T05:25Z
-- **Status:** in progress — scaffold + contract pushed, writing server handlers now.
-- **Goals now:** finish `server/src/index.ts` + `server/src/state/socket.ts`
-  (join/move/room:enter/room:leave/room:lock/disconnect), verify with a
-  2-client test script, push.
+- **Last update:** 2026-07-26T05:40Z
+- **Status:** done — spine is live and verified.
+- **Goals now:** available to help unblock B/C/D; will keep polling this file.
 - **Done:**
   - Monorepo scaffold: root `package.json` (npm workspaces: `shared`,
     `server`, `client`), root `.gitignore` (`node_modules/`, `dist/`, `.env`
@@ -73,23 +71,61 @@ LiveKit room names D will use:
     likely overwrite whatever I write. **B: please add D's client-only pins
     (see D's section below) into `client/package.json` when you scaffold
     Vite, don't drop them.**
+  - `server/src/index.ts`: Express + `http.createServer` + Socket.IO
+    (typed `Server<ClientToServerEvents, ServerToClientEvents>`), CORS via
+    `CLIENT_ORIGIN` env (defaults `*`), `GET /health`. Exports `io` as a
+    **decision**, not just a lean: C and D should import the router
+    **factory pattern**, not reach into `index.ts` — see wiring note below,
+    this avoids a circular import between `index.ts` and your route files.
+  - `server/src/state/socket.ts`: in-memory `Map<userId, User>` +
+    `Map<roomId, RoomState>`. Handlers: `join` (lazy room creation,
+    `locked:false, occupants:[]`), `move` (updates immediately, broadcast
+    throttled to 20Hz via one shared interval + dirty flag — not per-socket
+    timers), `room:enter` (denies locked rooms to non-owners via
+    `room:enter:denied`, else updates state + occupants + broadcasts),
+    `room:leave`, `room:lock` (owner-only), `disconnect` (removes from
+    presence + all rooms' occupants). Exports
+    `getUserState(userId): User | undefined` — **exact import path:
+    `server/src/state/socket.ts`**.
+  - Verified with `npm run verify --workspace server`
+    (`server/src/state/verify.ts`, boots its own instance on port 3999,
+    drives 2 real `socket.io-client` connections through join → move →
+    lock → denied-entry → unlock → entry, asserting on every event). All
+    checks pass. `npx tsc --noEmit` in `server/` is clean.
 - **Blocked on:** nothing.
 - **Requests to others:**
-  - **To D:** exact import path for `getUserState` will be
-    `server/src/state/socket.ts` (exported function
-    `getUserState(userId: string): User | undefined`). Landing this in the
-    same file as the socket handlers since it reads the same in-memory
-    `Map<userId, User>` — no separate `presence.ts`. For wiring `agent:done`:
-    I'll export the `io` instance (or a small `emitAgentDone(userId, roomId)`
-    helper) from `server/src/index.ts` — tell me which you'd rather import,
-    I lean toward exporting `io` directly since your notify router already
-    needs to call `getUserState` from the same server process.
+  - **To D:** exact import path for `getUserState` is
+    `server/src/state/socket.ts` (named export). For `agent:done`: **final
+    decision** — don't import `io` from `index.ts` (circular-import risk
+    since `index.ts` will need to import your router). Instead, write your
+    router as a factory that takes what it needs as arguments, e.g.:
+    ```ts
+    // server/src/notify/routes.ts
+    import type { Router } from 'express';
+    import type { Server } from 'socket.io';
+    import type { ClientToServerEvents, ServerToClientEvents } from '@hackerhouse/shared';
+    import type { getUserState } from '../state/socket.js';
+
+    export function createNotifyRouter(deps: {
+      io: Server<ClientToServerEvents, ServerToClientEvents>;
+      getUserState: typeof getUserState;
+    }): Router { /* ... */ }
+    ```
+    I'll wire it in `index.ts` as `app.use(createNotifyRouter({ io, getUserState }))`
+    once your file lands — just push `notify/routes.ts` exporting that shape
+    and I'll (or you can) do the one-line mount. Same pattern for
+    `voice/routes.ts` (probably doesn't need `getUserState`, just `io` isn't
+    even required there per the spec — token minting is stateless).
   - **To B:** see the `client/package.json` note above — apply D's client
-    pins when you scaffold Vite.
-- **Incoming requests:**
-  - **From D (mount):** use `createVoiceRouter()` +
-    `createNotifyRouter({ getUserState, emitAgentDone })` — see D section
-    for exact snippet. D prefers `emitAgentDone` helper over exporting raw `io`.
+    pins when you scaffold Vite. Also: `io` is exported from
+    `server/src/index.ts` for reference/type purposes only — your client
+    should talk to the server over `socket.io-client`, not import server
+    code.
+- **Incoming requests:** resolved —
+  - **From D (mount):** switched to `emitAgentDone` per your preference.
+    Wired `app.use(createVoiceRouter())` +
+    `app.use(createNotifyRouter({ getUserState, emitAgentDone }))` in
+    `index.ts`. `npm install` picked up your route files cleanly.
 
 ---
 

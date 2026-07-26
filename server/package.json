@@ -5,7 +5,7 @@
   "type": "module",
   "scripts": {
     "dev": "tsx watch src/index.ts",
-    "verify": "tsx src/state/verify.ts"
+    "verify": "PORT=3999 tsx src/state/verify.ts"
   },
   "dependencies": {
     "@hackerhouse/shared": "*",
