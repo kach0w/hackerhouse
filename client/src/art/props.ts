@@ -103,6 +103,38 @@ export function pingPongTable(): Px {
   return p;
 }
 
+export function airHockeyTable(): Px {
+  const p = new Px(64, 46);
+  const ice = '#dfe9f2';
+  const rail = '#3c4a5e';
+
+  // Legs.
+  p.rect(8, 34, 5, 11, shade(rail, -0.35));
+  p.rect(51, 34, 5, 11, shade(rail, -0.35));
+
+  // Cabinet + playfield.
+  p.rect(0, 26, 64, 12, shade(rail, -0.2));
+  p.rect(0, 2, 64, 26, rail);
+  p.rect(0, 2, 64, 2, shade(rail, 0.28));
+  p.rect(3, 5, 58, 20, ice);
+  p.dither(3, 5, 58, 20, '#c9d8e6', 0);
+
+  // Centre line, face-off spot and goal mouths.
+  p.vline(32, 5, 20, '#7fa8c8');
+  p.circle(32, 15, 3, '#7fa8c8');
+  p.circle(32, 15, 1, rail);
+  p.rect(3, 11, 2, 8, '#22303f');
+  p.rect(59, 11, 2, 8, '#22303f');
+
+  // Mallets and puck sitting on the table.
+  p.circle(13, 15, 3, '#5fd6cd');
+  p.circle(51, 15, 3, '#e8917f');
+  p.circle(32, 20, 2, '#1d2530');
+
+  p.outline(OUTLINE);
+  return p;
+}
+
 export function couch(): Px {
   const p = new Px(64, 38);
   const base = '#7a5a92';

@@ -568,6 +568,16 @@ body {
   letter-spacing: 2px;
 }
 
+/* Air hockey is a portrait table, so it needs a narrower frame than pong. */
+.pong-frame--tall {
+  width: min(52vw, 460px);
+}
+
+.pong-court--tall {
+  aspect-ratio: 132 / 196;
+  cursor: default;
+}
+
 .pong-court {
   position: relative;
   aspect-ratio: 220 / 132;

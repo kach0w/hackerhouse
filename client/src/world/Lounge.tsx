@@ -8,6 +8,7 @@
 
 import { useEffect, useRef, useState } from 'react';
 
+import { AirHockey } from '../games/airhockey/AirHockey';
 import { Pong } from '../games/pong/Pong';
 import { useSocket } from '../hooks/useSocket';
 import { LoungeStage } from './LoungeStage';
@@ -27,7 +28,8 @@ export function Lounge({ onStageReady, onGoToRoom }: Props) {
 
   const [selected, setSelected] = useState<string | null>(null);
   const [toast, setToast] = useState<string | null>(null);
-  const [pong, setPong] = useState(false);
+  /** Which minigame overlay is open, if any. Driven by clicking a station. */
+  const [game, setGame] = useState<'pong' | 'airhockey' | null>(null);
 
   // Keep the latest callbacks and presence reachable from the Pixi loop without
   // re-creating the stage on every render.
@@ -50,7 +52,8 @@ export function Lounge({ onStageReady, onGoToRoom }: Props) {
       onAvatarClick: (userId) => setSelected(userId),
       onStationClick: (stationId) => {
         const station = STATIONS.find((s) => s.id === stationId);
-        if (station?.minigame === 'pong') setPong(true);
+        if (station?.minigame === 'pong') setGame('pong');
+        else if (station?.minigame === 'airhockey') setGame('airhockey');
       },
     });
 
@@ -141,11 +144,19 @@ export function Lounge({ onStageReady, onGoToRoom }: Props) {
         1v1 is swapping in a SignalTransport once Builder A lands `game:signal`
         — the game and rendering code don't change. See CROSSTALK.
       */}
-      {pong && (
+      {game === 'pong' && (
         <Pong
           role="host"
           names={{ left: self?.name ?? 'you', right: 'bot' }}
-          onClose={() => setPong(false)}
+          onClose={() => setGame(null)}
+        />
+      )}
+
+      {game === 'airhockey' && (
+        <AirHockey
+          role="host"
+          names={{ bottom: self?.name ?? 'you', top: 'bot' }}
+          onClose={() => setGame(null)}
         />
       )}
     </div>
