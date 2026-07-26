@@ -23,7 +23,7 @@ import {
 } from 'react';
 import { io } from 'socket.io-client';
 
-import type { Facing, RoomState, User } from '@hackerhouse/shared';
+import type { Facing, JukeboxState, RoomState, User } from '@hackerhouse/shared';
 import { MockServer, type SocketLike } from '../mock/mockServer';
 
 /** Builder A throttles inbound moves; we throttle outbound to match (~18Hz). */
@@ -56,6 +56,9 @@ interface SocketApi {
   enterRoom: (roomId: string) => void;
   leaveRoom: (roomId: string) => void;
   setLocked: (locked: boolean) => void;
+  /** Shared lounge jam — null until the server's first jukebox:state arrives. */
+  jukebox: JukeboxState | null;
+  skipTrack: () => void;
 }
 
 const Ctx = createContext<SocketApi | null>(null);
@@ -86,6 +89,7 @@ export function SocketProvider({ children }: { children: ReactNode }) {
   const [deniedRoomId, setDeniedRoomId] = useState<string | null>(null);
   const [agentDone, setAgentDone] = useState<{ userId: string; roomId: string } | null>(null);
   const [connectError, setConnectError] = useState<string | null>(null);
+  const [jukebox, setJukebox] = useState<JukeboxState | null>(null);
 
   // Mock is opt-in, never a silent fallback.
   const usingMock = new URLSearchParams(window.location.search).get('mock') === '1';
@@ -112,11 +116,13 @@ export function SocketProvider({ children }: { children: ReactNode }) {
     const onAgentDone = (p: { userId: string; roomId: string }) => {
       if (p.userId === identity.userId) setAgentDone(p);
     };
+    const onJukebox = (p: JukeboxState) => setJukebox(p);
 
     socket.on('presence:update', onPresence);
     socket.on('room:update', onRoom);
     socket.on('room:enter:denied', onDenied);
     socket.on('agent:done', onAgentDone);
+    socket.on('jukebox:state', onJukebox);
 
     if (real) {
       // Re-`join` on every connect, not once at mount: after a dropped
@@ -150,6 +156,7 @@ export function SocketProvider({ children }: { children: ReactNode }) {
       socket.off('room:update', onRoom);
       socket.off('room:enter:denied', onDenied);
       socket.off('agent:done', onAgentDone);
+      socket.off('jukebox:state', onJukebox);
       socket.disconnect();
       socketRef.current = null;
       setConnected(false);
@@ -175,6 +182,10 @@ export function SocketProvider({ children }: { children: ReactNode }) {
 
   const clearAgentDone = useCallback(() => setAgentDone(null), []);
 
+  const skipTrack = useCallback(() => {
+    socketRef.current?.emit('jukebox:skip');
+  }, []);
+
   const value = useMemo<SocketApi>(() => {
     const self = users.find((u) => u.userId === identity.userId);
     return {
@@ -194,6 +205,8 @@ export function SocketProvider({ children }: { children: ReactNode }) {
       enterRoom,
       leaveRoom,
       setLocked,
+      jukebox,
+      skipTrack,
     };
   }, [
     connected,
@@ -210,6 +223,8 @@ export function SocketProvider({ children }: { children: ReactNode }) {
     enterRoom,
     leaveRoom,
     setLocked,
+    jukebox,
+    skipTrack,
   ]);
 
   return <Ctx.Provider value={value}>{children}</Ctx.Provider>;

@@ -18,3 +18,15 @@ export interface RoomState {
   locked: boolean;
   occupants: string[]; // userIds currently visiting (excludes owner)
 }
+
+export interface JukeboxTrack {
+  videoId: string; // YouTube video id
+  title: string;
+  durationSec: number;
+}
+
+export interface JukeboxState {
+  playlist: JukeboxTrack[];
+  index: number;
+  startedAt: number; // server Date.now() when the current track began
+}

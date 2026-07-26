@@ -11,6 +11,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import gsap from 'gsap';
 
+import { Jukebox } from './components/Jukebox';
 import { VoiceControls } from './components/VoiceControls';
 import { SocketProvider, useSocket } from './hooks/useSocket';
 import { AgentDoneCharacter } from './world/AgentDoneCharacter';
@@ -34,6 +35,8 @@ function House() {
     clearAgentDone,
     enterRoom,
     leaveRoom,
+    jukebox,
+    skipTrack,
   } = useSocket();
 
   // Dev shortcut: `?view=room` boots straight into your room with the terminal
@@ -141,6 +144,12 @@ function House() {
       {view === 'lounge' && !usingMock && (
         <div className="hud hud-topright">
           <VoiceControls identity={selfId} voiceRoom="lounge" serverHttpUrl={httpBase} />
+        </div>
+      )}
+
+      {view === 'lounge' && !usingMock && (
+        <div className="hud hud-bottomright">
+          <Jukebox jukebox={jukebox} onSkip={skipTrack} />
         </div>
       )}
 

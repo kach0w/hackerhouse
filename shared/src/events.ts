@@ -1,4 +1,4 @@
-import type { User, RoomState, Facing } from './types';
+import type { User, RoomState, Facing, JukeboxState, JukeboxTrack } from './types';
 
 // ---- Client -> Server (main namespace) ----
 export interface ClientToServerEvents {
@@ -7,6 +7,7 @@ export interface ClientToServerEvents {
   'room:enter': (payload: { roomId: string }) => void;
   'room:leave': (payload: { roomId: string }) => void;
   'room:lock': (payload: { locked: boolean }) => void; // only affects your own room
+  'jukebox:skip': () => void; // shared lounge jam, anyone can skip
 }
 
 // ---- Server -> Client (main namespace) ----
@@ -15,6 +16,7 @@ export interface ServerToClientEvents {
   'room:update': (payload: RoomState) => void;
   'room:enter:denied': (payload: { roomId: string; reason: 'locked' }) => void;
   'agent:done': (payload: { userId: string; roomId: string }) => void;
+  'jukebox:state': (payload: JukeboxState) => void;
 }
 
 // ---- Terminal namespace ("/terminal") ----
@@ -32,4 +34,4 @@ export interface TerminalServerToClient {
 // POST /notify        body: { userId: string }              — from the Claude Code Stop hook
 // POST /voice/token    body: { identity: string; room: string } -> { token: string }
 
-export type { User, RoomState, Facing };
+export type { User, RoomState, Facing, JukeboxState, JukeboxTrack };
