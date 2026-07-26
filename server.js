@@ -8,6 +8,10 @@ const { SerializeAddon } = require("@xterm/addon-serialize");
 
 const app = express();
 app.use(express.static("public"));
+// Served so the browser's one-time install command (curl $ORIGIN/agent/install.sh
+// | bash -s -- token $ORIGIN) can fetch the local companion — this app never
+// runs the companion itself, it only hands visitors the file to run locally.
+app.use("/agent", express.static("local-agent"));
 
 const server = http.createServer(app);
 const wss = new WebSocketServer({ server });

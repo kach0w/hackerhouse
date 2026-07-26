@@ -15,6 +15,22 @@
     #links { padding: 0 8px; font-size: 12px; opacity: 0.8; }
     #links a { color: #7cf; }
 
+    .hidden { display: none !important; }
+
+    .agent-onboard {
+      margin: 8px; padding: 12px 16px; background: #1a2a1a; border: 1px solid #345;
+      border-radius: 6px; max-width: 640px;
+    }
+    .agent-onboard p { margin: 4px 0; font-size: 13px; }
+    .agent-onboard button { background: #2d6; color: #111; border: none; padding: 6px 14px;
+      border-radius: 4px; cursor: pointer; font-weight: bold; }
+    .agent-onboard button:disabled { background: #464; color: #999; cursor: default; }
+    .agent-onboard code {
+      display: block; background: #000; color: #7cf; padding: 8px; border-radius: 4px;
+      font-size: 12px; margin: 6px 0; overflow-x: auto; white-space: pre;
+    }
+    #agentStatus { opacity: 0.8; font-size: 12px; }
+
     .view { display: none; }
     .view.active { display: block; }
 
@@ -112,14 +128,26 @@
   <div id="roomView" class="view">
     <div id="bar">
       <button id="toLoungeBtn">head to the lounge</button>
-      <button id="createBtn">create room</button>
-      <input id="joinId" placeholder="room id to join" />
-      <button id="joinBtn">join (read-only)</button>
-      <button id="lockBtn" disabled>lock room</button>
-      <button id="endBtn" disabled>end session</button>
+      <span id="shareControls">
+        <button id="createBtn">create room</button>
+        <input id="joinId" placeholder="room id to join" />
+        <button id="joinBtn">join (read-only)</button>
+        <button id="lockBtn" disabled>lock room</button>
+        <button id="endBtn" disabled>end session</button>
+      </span>
       <span id="roomStatus"></span>
     </div>
     <div id="links"></div>
+    <div id="agentOnboard" class="agent-onboard hidden">
+      <p>Get your terminal started — this happens once, ever, on this machine.</p>
+      <button id="startTerminalBtn">Get your terminal started</button>
+      <div id="agentCmdBox" class="hidden">
+        <p>Paste this into any terminal window, once:</p>
+        <code id="agentCmd"></code>
+        <button id="copyAgentCmd">copy</button>
+      </div>
+      <p id="agentStatus"></p>
+    </div>
     <div id="terminal"></div>
     <div id="roomFloor"></div>
   </div>
@@ -524,6 +552,19 @@
     let isOwner = false;
     let locked = false;
     let currentSessionId = null;
+    // Declared here (not just where they're first used below) so safeFit(),
+    // which xterm's ResizeObserver can fire synchronously during setup, never
+    // hits a temporal-dead-zone ReferenceError on these.
+    let agentSocket = null;
+    let agentConnected = false;
+
+    // Parsed up front (not just at the bottom) because the personal-terminal
+    // setup below needs to know immediately whether this page load is "my own
+    // room" (no ?room=) or someone's shared spectate link (?room=xxx) — those
+    // are two different features sharing the same #terminal element.
+    const params = new URLSearchParams(location.search);
+    const roomParam = params.get("room");
+    const tokenParam = params.get("token");
 
     const ws = new WebSocket(`ws://${location.host}`);
 
@@ -543,10 +584,14 @@
     function safeFit() {
       if (terminalEl.clientWidth === 0 || terminalEl.clientHeight === 0) return;
       fitAddon.fit();
-      if (isOwner && (term.cols !== lastSentCols || term.rows !== lastSentRows)) {
-        lastSentCols = term.cols;
-        lastSentRows = term.rows;
-        ws.send(JSON.stringify({ type: "resize", cols: term.cols, rows: term.rows }));
+      if (term.cols === lastSentCols && term.rows === lastSentRows) return;
+      lastSentCols = term.cols;
+      lastSentRows = term.rows;
+      const resizeMsg = JSON.stringify({ type: "resize", cols: term.cols, rows: term.rows });
+      if (agentConnected && agentSocket && agentSocket.readyState === agentSocket.OPEN) {
+        agentSocket.send(resizeMsg);
+      } else if (isOwner) {
+        ws.send(resizeMsg);
       }
     }
 
@@ -621,13 +666,113 @@
     };
 
     term.onData((data) => {
-      if (isOwner) ws.send(JSON.stringify({ type: "input", data }));
+      if (agentConnected && agentSocket && agentSocket.readyState === agentSocket.OPEN) {
+        agentSocket.send(JSON.stringify({ type: "input", data }));
+      } else if (isOwner) {
+        ws.send(JSON.stringify({ type: "input", data }));
+      }
     });
 
+    // ---------- personal terminal (local companion on the visitor's own
+    // machine) — this is the default "your room" experience. A ?room= link
+    // is the separate, unchanged spectate feature above, and skips all of this.
+    const AGENT_PORT = 47821; // must match local-agent/agent.js
+    const AGENT_TOKEN_KEY = "hh_agent_token";
+    const shareControls = document.getElementById("shareControls");
+    const agentOnboard = document.getElementById("agentOnboard");
+    const startTerminalBtn = document.getElementById("startTerminalBtn");
+    const agentCmdBox = document.getElementById("agentCmdBox");
+    const agentCmdEl = document.getElementById("agentCmd");
+    const copyAgentCmdBtn = document.getElementById("copyAgentCmd");
+    const agentStatusEl = document.getElementById("agentStatus");
+    let agentPollTimer = null;
+
+    // Resolves true/false rather than throwing — a missing local agent (not
+    // installed yet, or not running) is the expected common case, not an error.
+    function connectAgent(token) {
+      return new Promise((resolve) => {
+        let settled = false;
+        const sock = new WebSocket(`ws://localhost:${AGENT_PORT}`);
+        const fail = () => {
+          if (settled) return;
+          settled = true;
+          resolve(false);
+        };
+        sock.onerror = fail;
+        sock.onclose = fail;
+        sock.onopen = () => sock.send(JSON.stringify({ type: "hello", token }));
+        sock.onmessage = (ev) => {
+          const msg = JSON.parse(ev.data);
+          if (msg.type === "ready") {
+            settled = true;
+            agentSocket = sock;
+            agentConnected = true;
+            agentOnboard.classList.add("hidden");
+            terminalEl.classList.remove("hidden");
+            if (msg.buffer) term.write(msg.buffer);
+            setTimeout(() => safeFit(), 30);
+            resolve(true);
+          } else if (msg.type === "output") {
+            term.write(msg.data);
+          } else if (msg.type === "exited") {
+            agentConnected = false;
+            agentStatusEl.textContent = "your terminal session ended — reload the page to start a new one";
+          }
+        };
+      });
+    }
+
+    function startAgentPolling(token) {
+      if (agentPollTimer) return;
+      agentStatusEl.textContent = "waiting for your terminal to start… (flips over automatically, no need to refresh)";
+      agentPollTimer = setInterval(async () => {
+        const ok = await connectAgent(token);
+        if (ok) {
+          clearInterval(agentPollTimer);
+          agentPollTimer = null;
+        }
+      }, 1500);
+    }
+
+    function showOnboarding(existingToken) {
+      agentOnboard.classList.remove("hidden");
+      startTerminalBtn.onclick = () => {
+        const token = existingToken || crypto.randomUUID();
+        localStorage.setItem(AGENT_TOKEN_KEY, token);
+        const cmd = `curl -fsSL ${location.origin}/agent/install.sh | bash -s -- ${token} ${location.origin}`;
+        agentCmdEl.textContent = cmd;
+        agentCmdBox.classList.remove("hidden");
+        startTerminalBtn.disabled = true;
+        startAgentPolling(token);
+      };
+    }
+
+    copyAgentCmdBtn.onclick = () => {
+      navigator.clipboard.writeText(agentCmdEl.textContent).then(() => {
+        copyAgentCmdBtn.textContent = "copied!";
+        setTimeout(() => (copyAgentCmdBtn.textContent = "copy"), 1500);
+      });
+    };
+
+    function initPersonalTerminal() {
+      shareControls.classList.add("hidden");
+      terminalEl.classList.add("hidden");
+      const existingToken = localStorage.getItem(AGENT_TOKEN_KEY);
+      if (existingToken) {
+        connectAgent(existingToken).then((ok) => {
+          if (!ok) showOnboarding(existingToken);
+        });
+      } else {
+        showOnboarding(null);
+      }
+    }
+
+    // Runs once at load, independent of lounge/room view switching, so the
+    // connection is already up (or already polling) by the time the visitor
+    // walks into their room — matches "press it once, then it just stays there."
+    if (!roomParam) initPersonalTerminal();
+
     // auto-join if URL has ?room= (and optionally ?token= to rejoin as owner)
-    const params = new URLSearchParams(location.search);
-    const roomParam = params.get("room");
-    const tokenParam = params.get("token");
     if (roomParam) {
       ws.onopen = () =>
         ws.send(JSON.stringify({ type: "join", sessionId: roomParam, token: tokenParam }));
