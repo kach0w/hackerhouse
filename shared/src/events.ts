@@ -32,10 +32,25 @@ export interface TerminalClientToServer {
   'terminal:join': (payload: { roomId: string; role: 'owner' | 'visitor' }) => void;
   'terminal:input': (payload: { roomId: string; data: string }) => void; // dropped server-side if not owner
   'terminal:resize': (payload: { roomId: string; cols: number; rows: number }) => void;
+
+  // A room owner's own machine, running `claude` locally instead of the host
+  // spawning it. `token` must verify (via the main namespace's session
+  // tokens) to a userId === roomId — only the real owner can claim it.
+  // Prefixed `localAgent` (not `agent`) to avoid colliding with the
+  // unrelated `agent:done` "your Claude session finished" notification.
+  'localAgent:register': (payload: { roomId: string; token: string }) => void;
+  'localAgent:output': (payload: { roomId: string; data: string }) => void;
 }
 export interface TerminalServerToClient {
   'terminal:output': (payload: { roomId: string; data: string }) => void;
   'terminal:ready': (payload: { roomId: string }) => void;
+
+  'localAgent:registered': (payload: { roomId: string }) => void;
+  'localAgent:register:denied': (payload: { roomId: string; reason: string }) => void;
+  // Forwarded from a browser's terminal:input/resize once a local agent has
+  // claimed the room, instead of writing to a host-spawned pty directly.
+  'localAgent:input': (payload: { roomId: string; data: string }) => void;
+  'localAgent:resize': (payload: { roomId: string; cols: number; rows: number }) => void;
 }
 
 // ---- HTTP ----

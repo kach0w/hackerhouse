@@ -26,7 +26,13 @@ function appendToBuffer(session: TerminalSession, chunk: string) {
   session.buffer = (session.buffer + chunk).slice(-BUFFER_CAP);
 }
 
-function spawnClaudeOrFallback(roomId: string): IPty {
+/**
+ * `serverUrl` defaults to the host's own localhost — right for a PTY the
+ * host spawns for itself. The local agent (running on someone else's
+ * machine entirely) passes its own reachable server URL instead, so that
+ * machine's Stop hook posts /notify to the right place.
+ */
+export function spawnClaudeOrFallback(roomId: string, serverUrl?: string): IPty {
   const cwd = resolveCwd(roomId);
   console.log(`[terminal] room ${roomId} -> cwd ${cwd}`);
   const opts = {
@@ -36,7 +42,7 @@ function spawnClaudeOrFallback(roomId: string): IPty {
     cwd,
     env: {
       ...(process.env as Record<string, string>),
-      HACKERHOUSE_SERVER_URL: `http://localhost:${process.env.PORT ?? '3001'}`,
+      HACKERHOUSE_SERVER_URL: serverUrl ?? `http://localhost:${process.env.PORT ?? '3001'}`,
       HACKERHOUSE_USER_ID: roomId,
     },
   };
