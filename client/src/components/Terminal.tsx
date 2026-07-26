@@ -20,7 +20,6 @@ export function Terminal({ roomId, mode, userId, serverUrl }: TerminalProps) {
     const fitAddon = new FitAddon();
     term.loadAddon(fitAddon);
     if (containerRef.current) term.open(containerRef.current);
-    fitAddon.fit();
 
     const socket: Socket<TerminalServerToClient, TerminalClientToServer> = io(
       `${serverUrl}/terminal`,
@@ -39,16 +38,29 @@ export function Terminal({ roomId, mode, userId, serverUrl }: TerminalProps) {
     // visitor mode: no input handler attached at all, belt-and-suspenders
     // on top of the server-side enforcement, which is the real boundary.
 
-    const handleResize = () => {
+    const fitAndSync = () => {
       fitAddon.fit();
       if (mode === 'owner') {
         socket.emit('terminal:resize', { roomId, cols: term.cols, rows: term.rows });
       }
     };
-    window.addEventListener('resize', handleResize);
+
+    // Fitting immediately on mount reads wrong character metrics if the
+    // monospace font hasn't finished loading yet (or layout hasn't fully
+    // settled) — cols/rows come out wrong and output wraps/garbles until
+    // *something* triggers another fit. Gate the first one on fonts.ready
+    // instead of hoping a later resize event happens to fix it.
+    void document.fonts.ready.then(fitAndSync);
+
+    // A ResizeObserver on the terminal's own container reacts to any real
+    // size change (window resizing, the fullscreen/expand toggle, the
+    // monitor's glass rect updating) without needing Room.tsx to dispatch
+    // synthetic window 'resize' events as a workaround.
+    const ro = new ResizeObserver(() => fitAndSync());
+    if (containerRef.current) ro.observe(containerRef.current);
 
     return () => {
-      window.removeEventListener('resize', handleResize);
+      ro.disconnect();
       socket.disconnect();
       term.dispose();
     };

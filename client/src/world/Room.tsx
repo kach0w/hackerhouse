@@ -81,17 +81,6 @@ export function Room({
     return () => document.removeEventListener('fullscreenchange', onChange);
   }, [expanded, onToggleExpanded]);
 
-  // Builder C's Terminal refits xterm on `window.resize`. Our glass rect can
-  // change without the window changing (first layout, expand toggle), and a
-  // stale fit means the terminal wraps at the wrong column count. Nudging the
-  // event is the least invasive fix from outside C's file — see CROSSTALK for
-  // the standing request to expose an imperative refit or use a ResizeObserver.
-  useEffect(() => {
-    if (!screen) return;
-    const id = requestAnimationFrame(() => window.dispatchEvent(new Event('resize')));
-    return () => cancelAnimationFrame(id);
-  }, [screen?.width, screen?.height, expanded]);
-
   useEffect(() => {
     const host = hostRef.current;
     if (!host) return;

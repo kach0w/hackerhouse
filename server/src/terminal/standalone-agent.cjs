@@ -54,6 +54,18 @@ function resolveCwd(roomId) {
   return demoDir;
 }
 
+// If this agent happens to be launched from inside a Claude Code session,
+// strip CLAUDE_CODE_* markers so the spawned room session doesn't inherit
+// a "child session" warning it doesn't actually apply to.
+function cleanEnv(base) {
+  const env = {};
+  for (const [key, value] of Object.entries(base)) {
+    if (value === undefined || key.startsWith('CLAUDE_')) continue;
+    env[key] = value;
+  }
+  return env;
+}
+
 function spawnClaudeOrFallback(roomId) {
   const cwd = resolveCwd(roomId);
   console.log(`[agent] room ${roomId} -> cwd ${cwd}`);
@@ -63,7 +75,7 @@ function spawnClaudeOrFallback(roomId) {
     rows: 30,
     cwd,
     env: {
-      ...process.env,
+      ...cleanEnv(process.env),
       HACKERHOUSE_SERVER_URL: SERVER_URL,
       HACKERHOUSE_USER_ID: roomId,
     },

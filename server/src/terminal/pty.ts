@@ -79,6 +79,23 @@ function ensureNotifyHook(cwd: string): void {
   }
 }
 
+/**
+ * If this server itself was launched from inside a Claude Code session
+ * (e.g. by an agent driving the terminal via a shell tool), CLAUDE_CODE_*
+ * markers sit in our own process.env — and every room's spawned `claude`
+ * would inherit them, triggering its "transcript saving is off, inherited
+ * child-session marker" warning even though each room is a genuinely
+ * independent session, not actually nested inside anything.
+ */
+function cleanEnv(base: NodeJS.ProcessEnv): Record<string, string> {
+  const env: Record<string, string> = {};
+  for (const [key, value] of Object.entries(base)) {
+    if (value === undefined || key.startsWith('CLAUDE_')) continue;
+    env[key] = value;
+  }
+  return env;
+}
+
 interface TerminalSession {
   pty: IPty;
   buffer: string;
@@ -110,7 +127,7 @@ export function spawnClaudeOrFallback(roomId: string, serverUrl?: string): IPty 
     rows: 30,
     cwd,
     env: {
-      ...(process.env as Record<string, string>),
+      ...cleanEnv(process.env),
       HACKERHOUSE_SERVER_URL: serverUrl ?? `http://localhost:${process.env.PORT ?? '3001'}`,
       HACKERHOUSE_USER_ID: roomId,
     },
