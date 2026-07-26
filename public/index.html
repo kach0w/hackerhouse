@@ -100,7 +100,7 @@
       setTimeout(() => {
         loungeView.classList.toggle("active", showLounge);
         roomView.classList.toggle("active", !showLounge);
-        if (!showLounge) setTimeout(() => fitAddon.fit(), 50);
+        if (!showLounge) setTimeout(() => safeFit(), 50);
         setTimeout(() => fade.classList.remove("active"), 50);
       }, 400);
     }
@@ -112,13 +112,7 @@
       switchView(true);
     };
 
-    // ---------- terminal + room logic (unchanged) ----------
-    const term = new Terminal({ convertEol: true, fontSize: 14, theme: { background: "#111" } });
-    const fitAddon = new FitAddon.FitAddon();
-    term.loadAddon(fitAddon);
-    term.open(document.getElementById("terminal"));
-    fitAddon.fit();
-
+    // ---------- terminal + room logic ----------
     const status = document.getElementById("roomStatus");
     const links = document.getElementById("links");
     const lockBtn = document.getElementById("lockBtn");
@@ -128,6 +122,32 @@
     let currentSessionId = null;
 
     const ws = new WebSocket(`ws://${location.host}`);
+
+    const term = new Terminal({ convertEol: true, fontSize: 14, theme: { background: "#111" } });
+    const fitAddon = new FitAddon.FitAddon();
+    term.loadAddon(fitAddon);
+    const terminalEl = document.getElementById("terminal");
+    term.open(terminalEl);
+
+    let lastSentCols = null;
+    let lastSentRows = null;
+
+    // fitAddon.fit() divides by the container's box size, so fitting while
+    // it's hidden (e.g. mid view-transition, or width/height still 0) throws
+    // or leaves cols/rows at 0 — guard against that instead of trusting a
+    // window "resize" event to mean the terminal itself is visible and sized.
+    function safeFit() {
+      if (terminalEl.clientWidth === 0 || terminalEl.clientHeight === 0) return;
+      fitAddon.fit();
+      if (isOwner && (term.cols !== lastSentCols || term.rows !== lastSentRows)) {
+        lastSentCols = term.cols;
+        lastSentRows = term.rows;
+        ws.send(JSON.stringify({ type: "resize", cols: term.cols, rows: term.rows }));
+      }
+    }
+
+    new ResizeObserver(() => safeFit()).observe(terminalEl);
+    safeFit();
 
     ws.onmessage = (ev) => {
       const msg = JSON.parse(ev.data);
@@ -198,13 +218,6 @@
 
     term.onData((data) => {
       if (isOwner) ws.send(JSON.stringify({ type: "input", data }));
-    });
-
-    window.addEventListener("resize", () => {
-      fitAddon.fit();
-      if (isOwner) {
-        ws.send(JSON.stringify({ type: "resize", cols: term.cols, rows: term.rows }));
-      }
     });
 
     // auto-join if URL has ?room= (and optionally ?token= to rejoin as owner)
