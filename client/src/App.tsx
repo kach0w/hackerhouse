@@ -29,6 +29,7 @@ function House() {
     connected,
     usingMock,
     httpBase,
+    connectError,
     agentDone,
     clearAgentDone,
     enterRoom,
@@ -153,6 +154,9 @@ function House() {
         <span className={`status-dot${connected ? ' is-on' : ''}`} />
         <span>{self?.name ?? '…'}</span>
         {usingMock && <span className="status-mock">mock server</span>}
+        {!usingMock && connectError && (
+          <span className="status-error">no server at {httpBase} — {connectError}</span>
+        )}
         {phase !== 'idle' && <span className="status-phase">{phase}</span>}
       </div>
     </div>

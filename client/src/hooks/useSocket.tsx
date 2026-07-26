@@ -2,10 +2,13 @@
  * The single point of contact between the world frontend and Builder A's
  * server. Nothing else in client/ calls socket.io directly.
  *
- * If `VITE_SERVER_URL` is set we open a real socket.io connection; otherwise we
- * fall back to the in-browser MockServer so the world is developable before A's
- * server exists. Both satisfy `SocketLike`, so no calling code changes when we
- * cut over — you just set the env var.
+ * Talks to the real server by default. The in-browser MockServer is **opt-in**
+ * via `?mock=1` — it used to be the silent fallback whenever `VITE_SERVER_URL`
+ * was unset, which meant anyone without a `.env.local` got a convincing fake
+ * world and no terminal, with nothing on screen saying why. Defaulting to the
+ * real thing and failing loudly is the correct trade for a demo.
+ *
+ * Both paths satisfy `SocketLike`, so no calling code changes between them.
  */
 
 import {
@@ -26,8 +29,13 @@ import { MockServer, type SocketLike } from '../mock/mockServer';
 /** Builder A throttles inbound moves; we throttle outbound to match (~18Hz). */
 const MOVE_FLUSH_MS = 55;
 
+/** Where A's server lives unless `VITE_SERVER_URL` overrides it. */
+const DEFAULT_SERVER_URL = 'http://localhost:3001';
+
 interface SocketApi {
   connected: boolean;
+  /** Non-null when we cannot reach the server — surfaced in the status strip. */
+  connectError: string | null;
   usingMock: boolean;
   /**
    * Express base URL, passed to Builder C's <Terminal serverUrl> and Builder
@@ -77,18 +85,20 @@ export function SocketProvider({ children }: { children: ReactNode }) {
   const [rooms, setRooms] = useState<Map<string, RoomState>>(new Map());
   const [deniedRoomId, setDeniedRoomId] = useState<string | null>(null);
   const [agentDone, setAgentDone] = useState<{ userId: string; roomId: string } | null>(null);
+  const [connectError, setConnectError] = useState<string | null>(null);
 
-  const serverUrl = import.meta.env.VITE_SERVER_URL as string | undefined;
-  const usingMock = !serverUrl;
-  const httpBase = serverUrl ?? 'http://localhost:3001';
+  // Mock is opt-in, never a silent fallback.
+  const usingMock = new URLSearchParams(window.location.search).get('mock') === '1';
+  const httpBase = (import.meta.env.VITE_SERVER_URL as string | undefined) ?? DEFAULT_SERVER_URL;
 
   // Outbound move throttle: buffer the latest position, flush on an interval.
   const pendingMove = useRef<{ x: number; y: number; facing: Facing } | null>(null);
 
   useEffect(() => {
-    const socket: SocketLike = serverUrl
-      ? (io(serverUrl, { transports: ['websocket'] }) as unknown as SocketLike)
-      : new MockServer();
+    const real = usingMock ? null : io(httpBase, { transports: ['websocket'] });
+    const socket: SocketLike = real
+      ? (real as unknown as SocketLike)
+      : (new MockServer() as SocketLike);
     socketRef.current = socket;
 
     const onPresence = (p: { users: User[] }) => setUsers(p.users);
@@ -108,8 +118,24 @@ export function SocketProvider({ children }: { children: ReactNode }) {
     socket.on('room:enter:denied', onDenied);
     socket.on('agent:done', onAgentDone);
 
-    socket.emit('join', identity);
-    setConnected(true);
+    if (real) {
+      // Re-`join` on every connect, not once at mount: after a dropped
+      // connection socket.io reconnects with a new socket id, and without a
+      // fresh join the server has no record of us and we vanish from presence.
+      real.on('connect', () => {
+        setConnected(true);
+        setConnectError(null);
+        socket.emit('join', identity);
+      });
+      real.on('disconnect', () => setConnected(false));
+      real.on('connect_error', (err: Error) => {
+        setConnected(false);
+        setConnectError(err.message || 'connection failed');
+      });
+    } else {
+      socket.emit('join', identity);
+      setConnected(true);
+    }
 
     const flush = window.setInterval(() => {
       const m = pendingMove.current;
@@ -128,7 +154,7 @@ export function SocketProvider({ children }: { children: ReactNode }) {
       socketRef.current = null;
       setConnected(false);
     };
-  }, [serverUrl, identity]);
+  }, [usingMock, httpBase, identity]);
 
   const sendMove = useCallback((x: number, y: number, facing: Facing) => {
     pendingMove.current = { x, y, facing };
@@ -153,6 +179,7 @@ export function SocketProvider({ children }: { children: ReactNode }) {
     const self = users.find((u) => u.userId === identity.userId);
     return {
       connected,
+      connectError,
       usingMock,
       httpBase,
       selfId: identity.userId,
@@ -170,6 +197,7 @@ export function SocketProvider({ children }: { children: ReactNode }) {
     };
   }, [
     connected,
+    connectError,
     usingMock,
     httpBase,
     identity.userId,

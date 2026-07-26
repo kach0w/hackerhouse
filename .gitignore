@@ -3,3 +3,5 @@ dist/
 .env
 .DS_Store
 LIVEKIT_SHARE.txt
+.env.local
+.env*.local

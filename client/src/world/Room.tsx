@@ -96,8 +96,8 @@ export function Room({
       <div className={`terminal-pane${terminalVisible ? ' is-in' : ''}`}>
         {usingMock ? (
           <div className="stub-pane">
-            no VITE_SERVER_URL — running against the in-browser mock, so there's no
-            PTY to attach to. Point at Builder A&apos;s server to get a real terminal.
+            <code>?mock=1</code> — running against the in-browser mock, which has no
+            PTY. Drop the flag and start the server to get a real terminal.
           </div>
         ) : (
           <Terminal

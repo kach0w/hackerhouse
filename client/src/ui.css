@@ -507,3 +507,10 @@ body {
 .status-phase {
   color: var(--accent);
 }
+
+.status-error {
+  border: 1px solid rgba(232, 145, 127, 0.4);
+  border-radius: 4px;
+  padding: 2px 6px;
+  color: #e8917f;
+}
