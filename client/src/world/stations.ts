@@ -17,7 +17,7 @@
 
 import type { Px } from '../art/PixelCanvas';
 import {
-  airHockeyTable,
+  arcadeCabinet,
   beanbag,
   bookshelf,
   coffeeBar,
@@ -57,7 +57,7 @@ export interface Station {
   /** ms range an avatar lingers here before wandering off. */
   dwell: [number, number];
   /** Which minigame this station opens, if any. */
-  minigame?: 'pong' | 'pool' | 'airhockey';
+  minigame?: 'pong' | 'pool' | 'snake';
 }
 
 export const STATIONS: Station[] = [
@@ -109,19 +109,19 @@ export const STATIONS: Station[] = [
     minigame: 'pong',
   },
   {
-    id: 'airhockey',
-    label: 'Air hockey',
-    sprite: airHockeyTable,
-    x: 176,
-    y: 112,
-    footY: 158,
-    activity: 'pingpong',
+    id: 'arcade',
+    label: 'Arcade',
+    sprite: arcadeCabinet,
+    x: 182,
+    y: 96,
+    footY: 154,
+    activity: 'stand',
     slots: [
-      { x: 168, y: 148, facing: 'right' },
-      { x: 248, y: 148, facing: 'left' },
+      { x: 199, y: 164, facing: 'up' },
+      { x: 172, y: 158, facing: 'right' },
     ],
-    dwell: [6000, 13000],
-    minigame: 'airhockey',
+    dwell: [6000, 14000],
+    minigame: 'snake',
   },
   {
     id: 'couch',
