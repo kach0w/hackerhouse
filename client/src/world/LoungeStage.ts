@@ -65,7 +65,7 @@ const MAX_SCALE = 4;
 
 export interface LoungeCallbacks {
   onSelfMove: (x: number, y: number, facing: Facing) => void;
-  /** Clicking a station. Inert tonight — the seam for 1v1 minigames. */
+  /** Clicking a station with a `minigame` opens its game overlay — see Lounge.tsx. */
   onStationClick?: (stationId: string) => void;
 }
 
@@ -434,7 +434,17 @@ export class LoungeStage {
       if (opts.onTap) {
         node.eventMode = 'static';
         node.cursor = 'pointer';
-        node.on('pointertap', opts.onTap);
+        // `pointertap` requires the same target under the cursor at both
+        // pointerdown *and* pointerup — but the camera continuously re-centers
+        // on the self avatar's ambient wandering, so on any window where the
+        // room doesn't fully fit (most laptops), the world scrolls under a
+        // held-down cursor and the station slides out from under it before
+        // release. That silently drops the click. Firing on pointerdown
+        // sidesteps it entirely: these are static furniture, not draggable,
+        // so "press" and "tap" are the same gesture here anyway.
+        node.on('pointerdown', (e) => {
+          if (e.button === 0) opts.onTap!();
+        });
       }
       this.sortLayer.addChild(node);
     };
