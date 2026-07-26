@@ -61,6 +61,8 @@ interface SocketApi {
   skipTrack: () => void;
   /** roomIds with a live terminal session (someone's claude/$SHELL pty running right now). */
   activeRooms: Set<string>;
+  /** Signed session token from join:ok — needed to run your own local terminal agent. */
+  sessionToken: string | null;
 }
 
 const Ctx = createContext<SocketApi | null>(null);
@@ -93,6 +95,7 @@ export function SocketProvider({ children }: { children: ReactNode }) {
   const [connectError, setConnectError] = useState<string | null>(null);
   const [jukebox, setJukebox] = useState<JukeboxState | null>(null);
   const [activeRooms, setActiveRooms] = useState<Set<string>>(new Set());
+  const [sessionTokenState, setSessionTokenState] = useState<string | null>(null);
 
   // Mock is opt-in, never a silent fallback.
   const usingMock = new URLSearchParams(window.location.search).get('mock') === '1';
@@ -133,6 +136,7 @@ export function SocketProvider({ children }: { children: ReactNode }) {
     const onJoinOk = (p: { userId: string; token: string }) => {
       if (p.userId !== identity.userId) return;
       sessionToken.current = p.token;
+      setSessionTokenState(p.token);
       // Only the owner can ever use their own token to run an agent, so
       // logging it is only actionable by the person it belongs to.
       console.log(
@@ -241,6 +245,7 @@ export function SocketProvider({ children }: { children: ReactNode }) {
       jukebox,
       skipTrack,
       activeRooms,
+      sessionToken: sessionTokenState,
     };
   }, [
     connected,
@@ -260,6 +265,7 @@ export function SocketProvider({ children }: { children: ReactNode }) {
     jukebox,
     skipTrack,
     activeRooms,
+    sessionTokenState,
   ]);
 
   return <Ctx.Provider value={value}>{children}</Ctx.Provider>;

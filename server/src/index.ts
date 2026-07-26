@@ -8,6 +8,7 @@ import { registerPresenceHandlers, getUserState, emitAgentDone } from './state/s
 import { createVoiceRouter } from './voice/routes.js';
 import { createNotifyRouter } from './notify/routes.js';
 import { registerTerminalNamespace } from './terminal/socket.js';
+import { createAgentRouter } from './terminal/agent-routes.js';
 import { registerJukebox } from './jukebox/state.js';
 
 const PORT = Number(process.env.PORT ?? 3001);
@@ -31,6 +32,7 @@ registerPresenceHandlers(io);
 
 app.use(createVoiceRouter());
 app.use(createNotifyRouter({ getUserState, emitAgentDone }));
+app.use(createAgentRouter());
 
 registerTerminalNamespace(io);
 registerJukebox(io);

@@ -1,0 +1,10 @@
+{
+  "name": "hackerhouse-local-agent",
+  "version": "1.0.0",
+  "private": true,
+  "main": "agent.js",
+  "dependencies": {
+    "socket.io-client": "^4.8.1",
+    "node-pty": "^1.1.0"
+  }
+}

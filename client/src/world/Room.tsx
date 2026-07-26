@@ -40,9 +40,11 @@ export function Room({
   const hostRef = useRef<HTMLDivElement>(null);
   const sceneRef = useRef<HTMLDivElement>(null);
   const stageRef = useRef<RoomStage | null>(null);
-  const { selfId, users, rooms, setLocked, httpBase, usingMock } = useSocket();
+  const { selfId, users, rooms, setLocked, httpBase, usingMock, sessionToken } = useSocket();
 
   const [screen, setScreen] = useState<ScreenRect | null>(null);
+  const [showAgentPanel, setShowAgentPanel] = useState(false);
+  const [copied, setCopied] = useState(false);
 
   const isOwner = roomId === selfId;
   const room = rooms.get(roomId);
@@ -133,6 +135,18 @@ export function Room({
     stageRef.current?.syncOccupants(occupants, selfId, roomId);
   }, [users, selfId, roomId]);
 
+  const installCmd = sessionToken
+    ? `curl -fsSL ${httpBase}/agent/install.sh | bash -s -- ${sessionToken} ${httpBase} ${selfId}`
+    : '';
+
+  const copyInstallCmd = () => {
+    if (!installCmd) return;
+    navigator.clipboard.writeText(installCmd).then(() => {
+      setCopied(true);
+      setTimeout(() => setCopied(false), 1500);
+    });
+  };
+
   const visitors = users.filter(
     (u) => u.state === 'room' && u.roomId === roomId && u.userId !== roomId,
   );
@@ -218,11 +232,41 @@ export function Room({
             </button>
           )}
 
+          {isOwner && sessionToken && (
+            <button
+              className="btn btn-icon"
+              title="Run your terminal on your own machine, under your own claude login"
+              onClick={() => setShowAgentPanel((v) => !v)}
+            >
+              🖥
+            </button>
+          )}
+
           <button className="btn btn-primary" onClick={onLeave}>
             Head to the lounge
           </button>
         </div>
       </div>
+
+      {showAgentPanel && isOwner && sessionToken && (
+        <div className="agent-panel">
+          <div className="agent-panel-title">run this on your own machine</div>
+          <p className="agent-panel-sub">
+            One-time install. After this, your room's terminal runs on your machine under
+            your own <code>claude</code> login — no command needed again, even after a
+            reboot.
+          </p>
+          <code className="agent-panel-cmd">{installCmd}</code>
+          <div className="agent-panel-actions">
+            <button className="btn btn-primary" onClick={copyInstallCmd}>
+              {copied ? 'copied!' : 'copy command'}
+            </button>
+            <button className="btn" onClick={() => setShowAgentPanel(false)}>
+              Close
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
