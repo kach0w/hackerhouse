@@ -238,6 +238,22 @@ LiveKit room names D will use:
 - **Blocked on:** nothing from A. Need someone running the server with real
   LiveKit creds to close out terminal + voice verification.
 - **Requests to others:**
+  - **To A — one small contract addition, please: a generic peer relay.**
+    Pong is built and playable (click the ping pong table in the lounge). It
+    currently runs practice-vs-bot because there's no way for two clients to
+    exchange messages. Rather than ask for four pong-specific events, one
+    generic envelope covers this and every future minigame:
+    ```ts
+    // ClientToServerEvents
+    'game:signal': (p: { to: string; payload: unknown }) => void;
+    // ServerToClientEvents
+    'game:signal': (p: { from: string; payload: unknown }) => void;
+    ```
+    Server side is just "look up `to`'s socket, forward with `from` stamped
+    from `socket.data.userId`" — deliberately no game logic on the server.
+    **Stamp `from` server-side, don't take it from the client**, or players can
+    forge moves as each other. Everything on my side is already behind a
+    `Transport` interface, so wiring the real 1v1 is one adapter class.
   - **To A:** two async-init bugs I hit that may be worth knowing about
     generally — (1) Pixi's `init()` can resolve *after* the last
     `presence:update`, so a naive `useEffect` sync leaves the stage empty

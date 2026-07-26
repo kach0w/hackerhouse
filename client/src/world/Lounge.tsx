@@ -8,8 +8,10 @@
 
 import { useEffect, useRef, useState } from 'react';
 
+import { Pong } from '../games/pong/Pong';
 import { useSocket } from '../hooks/useSocket';
 import { LoungeStage } from './LoungeStage';
+import { STATIONS } from './stations';
 
 interface Props {
   /** Hands the stage up to App so the transition can drive scripted walks. */
@@ -21,10 +23,11 @@ interface Props {
 export function Lounge({ onStageReady, onGoToRoom }: Props) {
   const hostRef = useRef<HTMLDivElement>(null);
   const stageRef = useRef<LoungeStage | null>(null);
-  const { selfId, users, loungeUsers, rooms, sendMove, deniedRoomId } = useSocket();
+  const { selfId, self, users, loungeUsers, rooms, sendMove, deniedRoomId } = useSocket();
 
   const [selected, setSelected] = useState<string | null>(null);
   const [toast, setToast] = useState<string | null>(null);
+  const [pong, setPong] = useState(false);
 
   // Keep the latest callbacks and presence reachable from the Pixi loop without
   // re-creating the stage on every render.
@@ -45,8 +48,9 @@ export function Lounge({ onStageReady, onGoToRoom }: Props) {
     const stage = new LoungeStage(host, {
       onSelfMove: (x, y, facing) => sendMoveRef.current(x, y, facing),
       onAvatarClick: (userId) => setSelected(userId),
-      onStationClick: () => {
-        // Reserved for the 1v1 minigames. Intentionally inert tonight.
+      onStationClick: (stationId) => {
+        const station = STATIONS.find((s) => s.id === stationId);
+        if (station?.minigame === 'pong') setPong(true);
       },
     });
 
@@ -131,6 +135,19 @@ export function Lounge({ onStageReady, onGoToRoom }: Props) {
       )}
 
       {toast && <div className="toast">{toast}</div>}
+
+      {/*
+        No transport passed yet, so this runs practice-vs-bot. Wiring the real
+        1v1 is swapping in a SignalTransport once Builder A lands `game:signal`
+        — the game and rendering code don't change. See CROSSTALK.
+      */}
+      {pong && (
+        <Pong
+          role="host"
+          names={{ left: self?.name ?? 'you', right: 'bot' }}
+          onClose={() => setPong(false)}
+        />
+      )}
     </div>
   );
 }

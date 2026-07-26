@@ -522,6 +522,110 @@ body {
   justify-content: center;
 }
 
+/* --- Pong ------------------------------------------------------------------ */
+
+.pong {
+  position: absolute;
+  inset: 0;
+  z-index: 14;
+  display: grid;
+  place-items: center;
+  background: rgba(6, 8, 12, 0.82);
+  backdrop-filter: blur(3px);
+}
+
+.pong-frame {
+  position: relative;
+  width: min(88vw, 900px);
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 16px;
+  background: var(--panel);
+  border: 1px solid var(--edge);
+  border-radius: 12px;
+}
+
+.pong-hud {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-size: 12px;
+}
+
+.pong-name {
+  color: var(--muted);
+}
+
+.pong-name.is-me {
+  color: var(--text);
+  font-weight: 700;
+}
+
+.pong-score {
+  font-size: 20px;
+  font-weight: 700;
+  letter-spacing: 2px;
+}
+
+.pong-court {
+  position: relative;
+  aspect-ratio: 220 / 132;
+  width: 100%;
+  border-radius: 6px;
+  overflow: hidden;
+  cursor: none;
+  touch-action: none;
+}
+
+.pong-court canvas {
+  display: block;
+  image-rendering: pixelated;
+}
+
+.pong-overlay {
+  position: absolute;
+  inset: 56px 16px 44px;
+  display: grid;
+  place-items: center;
+  gap: 14px;
+  font-size: 42px;
+  font-weight: 700;
+  color: var(--text);
+  pointer-events: none;
+}
+
+.pong-overlay--result {
+  background: rgba(6, 8, 12, 0.72);
+  border-radius: 6px;
+  pointer-events: auto;
+}
+
+.pong-result {
+  font-size: 24px;
+  letter-spacing: 2px;
+}
+
+.pong-actions {
+  display: flex;
+  gap: 8px;
+}
+
+.pong-foot {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  font-size: 10.5px;
+  color: var(--muted);
+}
+
+.pong-tag {
+  border: 1px solid var(--edge);
+  border-radius: 4px;
+  padding: 2px 6px;
+}
+
 /* --- Overlays -------------------------------------------------------------- */
 
 .fade-overlay {
