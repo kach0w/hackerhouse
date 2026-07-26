@@ -339,19 +339,19 @@ export class RoomStage {
     };
 
     // --- Wall ---------------------------------------------------------------
-    add(windowPane(), ROOM_CX - 330, 150, Z.wallDecor);
-    add(poster('#c96f52'), ROOM_CX + 186, 142, Z.wallDecor);
-    add(poster('#46ad6a'), ROOM_CX + 232, 156, Z.wallDecor);
-    add(poster('#3f84d6'), ROOM_CX - 246, 160, Z.wallDecor);
+    add(windowPane(), ROOM_CX - 228, 120, Z.wallDecor);
+    add(poster('#c96f52'), ROOM_CX + 168, 118, Z.wallDecor);
+    add(poster('#46ad6a'), ROOM_CX + 204, 138, Z.wallDecor);
+    add(poster('#3f84d6'), ROOM_CX - 172, 138, Z.wallDecor);
     add(doorSprite(), ROOM_DOOR.x - 17, ROOM_FLOOR_TOP - 56, Z.wallDecor);
 
     // --- Floor furniture ----------------------------------------------------
-    // Kept fairly close to centre — on a narrow window only ~±190 native px
-    // either side of the desk is guaranteed visible.
-    add(bed(), ROOM_CX - 318, 196, Z.furniture, { shadowY: 254 });
-    add(bookshelf(), ROOM_CX + 214, 208, Z.furniture, { shadowY: 258 });
-    add(plant(), ROOM_CX + 176, 296, Z.furniture + 40, { shadowY: 330 });
-    add(plant(), ROOM_CX - 196, 302, Z.furniture + 40, { shadowY: 336 });
+    // Kept close to centre: at the zoom the monitor demands, only about ±240
+    // native px either side of the desk is on screen at 1440 wide.
+    add(bed(), ROOM_CX - 232, 196, Z.furniture, { shadowY: 254 });
+    add(bookshelf(), ROOM_CX + 196, 208, Z.furniture, { shadowY: 258 });
+    add(plant(), ROOM_CX + 166, 296, Z.furniture + 40, { shadowY: 330 });
+    add(plant(), ROOM_CX - 172, 302, Z.furniture + 40, { shadowY: 336 });
 
     // --- The desk setup -----------------------------------------------------
     add(deskSlab(DESK_TOP.w, DESK_TOP.h), DESK_TOP.x, DESK_TOP.y, Z.desk, { shadowY: 306 });

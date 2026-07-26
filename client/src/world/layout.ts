@@ -72,16 +72,15 @@ export function facingFromDelta(dx: number, dy: number): 'up' | 'down' | 'left' 
 // --- Room scene geometry -----------------------------------------------------
 
 /**
- * The room fills the whole viewport. Your avatar sits at a desk with a large
+ * The room fills the whole viewport: your avatar sits at a desk with a large
  * monitor, and the real terminal is positioned exactly over that monitor's
- * screen — so the agent is running on the machine your character is using,
- * rather than in a panel bolted above the scene.
- */
-/**
- * The room is a large tilemap that the camera sits *inside*, rather than a
- * fixed picture scaled to fit. Letterboxing a fixed room meant a tall window
- * showed a small rectangle floating in black; this way the floor and walls
- * always run to the edges of the screen at a clean integer zoom.
+ * glass — so the agent runs on the machine your character is using, rather
+ * than in a panel bolted above the scene.
+ *
+ * It's a large tilemap the camera sits *inside*, not a fixed picture scaled to
+ * fit. Letterboxing a fixed room meant a tall window showed a small rectangle
+ * floating in black; this way floor and walls run to every edge at a clean
+ * integer zoom.
  */
 export const ROOM_PX_W = 1024;
 export const ROOM_PX_H = 640;
@@ -93,15 +92,27 @@ export const ROOM_WALL_ROWS = ROOM_FLOOR_TOP / TILE;
 /** The desk composition is centred on this column. */
 export const ROOM_CX = 512;
 
-/** What the camera looks at, and roughly the minimum area kept visible. */
 /**
- * Camera target: the midpoint of the composition (monitor top ~120 down to the
+ * Camera target: the midpoint of the composition (monitor top ~87 down to the
  * chair ~352), so the whole desk setup stays framed rather than clipping the
  * top of the bezel.
  */
 export const ROOM_FOCUS = { x: ROOM_CX, y: 220 };
-export const ROOM_VIEW_W = 420;
-export const ROOM_VIEW_H = 320;
+
+/**
+ * The area the camera guarantees is visible — and therefore what sets the zoom.
+ *
+ * ⚠️ These are load-bearing, not slack. Zoom is `floor(min(w/VIEW_W, h/VIEW_H))`,
+ * so nudging either value up can cross an integer threshold and drop the zoom a
+ * whole step, which makes everything *smaller* on screen even as it grows in
+ * native pixels. That already happened once: VIEW_H 300 → 320 took a 1440x900
+ * window from 3x to 2x and shrank the monitor from 564px to 470px of glass.
+ *
+ * Keep these just above the composition's real extent (≈340 x ≈265) and change
+ * them only while watching the resulting glass width.
+ */
+export const ROOM_VIEW_W = 360;
+export const ROOM_VIEW_H = 275;
 
 /** Monitor bezel footprint, native px. */
 export const MONITOR = { x: ROOM_CX - 130, y: 87, w: 260, h: 165 };
