@@ -53,9 +53,45 @@ LiveKit room names D will use:
 
 ## Builder A — State server & contract
 
-- **Last update:** 2026-07-26T05:40Z
-- **Status:** done — spine is live and verified.
+- **Last update:** 2026-07-26T06:05Z
+- **Status:** done — spine live, verified, and just hardened after a self-review.
 - **Goals now:** available to help unblock B/C/D; will keep polling this file.
+- **Self-review findings + fixes (ran /code-review medium on the shared+server
+  diff, all in files I own, no other builder's directories touched):**
+  - **FIXED — reconnect race:** `disconnect` was deleting the user from
+    presence unconditionally. A browser refresh (old socket's disconnect
+    processed after the new socket's join) could wipe a live reconnected
+    user. Now tracks `activeSockets: Map<userId, socketId>`; a stale socket's
+    disconnect is a no-op if a newer socket already re-registered that userId.
+  - **FIXED — ghost occupants:** `room:enter` never removed a user from the
+    room they were previously visiting before adding them to a new one.
+    Jumping room→room without an intervening `room:leave` left permanent
+    ghost occupants. Extracted a `leaveCurrentRoom` helper, used by both
+    `room:enter` and `room:leave`.
+  - **FIXED — build-breaking contract bug:** `shared/src/events.ts` re-exported
+    `User`/`RoomState` as values instead of `export type`. Confirmed via
+    `tsc --isolatedModules` this is a hard compile error — and Vite's default
+    tsconfig sets `isolatedModules: true`, so **this would have broken
+    Builder B's build the moment they scaffolded Vite and imported from
+    shared/**. Now `import type`/`export type` throughout events.ts.
+  - **FIXED — dropped `facing` field:** the `move` event contract declared
+    `facing` but the handler dropped it and `User` had no field for it, so
+    avatar direction could never reach other clients. Added `Facing` type to
+    shared/src/types.ts, `User.facing`, threaded through join/move — **B: your
+    avatars can now render facing direction from `presence:update`, it
+    wasn't reaching you before.**
+  - **FIXED — broken script:** root `build:shared` referenced a nonexistent
+    script; added `"build": "tsc --noEmit"` to shared/package.json.
+  - **NOTED, not fixed (flagging for C):** `join` trusts the client-supplied
+    `userId` with zero auth — any socket can claim any userId today, which
+    only matters for room:lock griefing right now but is the same trust gap
+    ENGINEERING_PLAN.md calls out as the real risk for terminal owner/visitor
+    enforcement. Didn't build auth solo since C's terminal handshake needs to
+    agree on the same mechanism — **C: let's design this together when you
+    start the port, not two independent half-solutions.**
+  - Added 2 new regression tests to `server/src/state/verify.ts` covering the
+    reconnect race and ghost-occupant fixes. All 9 checks pass, `tsc --noEmit`
+    clean in both `shared/` and `server/`.
 - **Done:**
   - Monorepo scaffold: root `package.json` (npm workspaces: `shared`,
     `server`, `client`), root `.gitignore` (`node_modules/`, `dist/`, `.env`

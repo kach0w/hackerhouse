@@ -105,8 +105,54 @@ async function main() {
   check('room:update shows B as occupant', roomUpdate.occupants.includes('userB'));
   check('presence:update shows B.roomId === userA', enteredPresence.users.find((u) => u.userId === 'userB')?.roomId === 'userA');
 
+  console.log('Test: room:enter cleans up the occupant\'s previous room (no ghost occupants)');
+  const c = await connect('userC', 'Carol');
+  await waitFor<{ users: { userId: string }[] }>(c, 'presence:update', (p) => p.users.length >= 3);
+  const cEntersA = waitFor<{ roomId: string; occupants: string[] }>(
+    c,
+    'room:update',
+    (r) => r.roomId === 'userA' && r.occupants.includes('userC'),
+  );
+  c.emit('room:enter', { roomId: 'userA' });
+  await cEntersA;
+  // C jumps straight into B's room without an intervening room:leave.
+  const cEntersB = waitFor<{ roomId: string; occupants: string[] }>(
+    c,
+    'room:update',
+    (r) => r.roomId === 'userB' && r.occupants.includes('userC'),
+  );
+  c.emit('room:enter', { roomId: 'userB' });
+  const roomBAfterC = await cEntersB;
+  check('C is now an occupant of room userB', roomBAfterC.occupants.includes('userC'));
+  // Force a fresh room:update for A's room (toggling the lock re-broadcasts
+  // it) and confirm C was actually removed from it when C moved to userB.
+  const roomAFresh = waitFor<{ roomId: string; occupants: string[] }>(a, 'room:update', (r) => r.roomId === 'userA');
+  a.emit('room:lock', { locked: false });
+  const finalRoomA = await roomAFresh;
+  check('C no longer ghosts in room userA after moving to userB', !finalRoomA.occupants.includes('userC'));
+
+  console.log('Test: a stale socket\'s late disconnect does not wipe a reconnected user');
+  const d1 = await connect('userD', 'Dana');
+  await waitFor<{ users: { userId: string }[] }>(d1, 'presence:update', (p) => p.users.some((u) => u.userId === 'userD'));
+  const d2 = await connect('userD', 'Dana'); // simulates a browser refresh: same userId, new socket
+  await waitFor<{ users: { userId: string }[] }>(d2, 'presence:update', (p) => p.users.some((u) => u.userId === 'userD'));
+  d1.disconnect(); // the stale socket's disconnect should be a no-op now that d2 owns userD
+  await new Promise((resolve) => setTimeout(resolve, 300));
+  d2.emit('move', { x: 99, y: 99, facing: 'up' });
+  const afterStaleDisconnect = await waitFor<{ users: { userId: string; x: number; y: number }[] }>(
+    c,
+    'presence:update',
+    (p) => p.users.find((u) => u.userId === 'userD')?.x === 99,
+  );
+  check(
+    'userD survives the stale socket\'s disconnect and stays live on the new socket',
+    afterStaleDisconnect.users.some((u) => u.userId === 'userD' && u.x === 99),
+  );
+  d2.disconnect();
+
   a.disconnect();
   b.disconnect();
+  c.disconnect();
 
   console.log(failed ? '\nSome checks FAILED.' : '\nAll checks passed.');
   process.exit(failed ? 1 : 0);

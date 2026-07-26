@@ -1,11 +1,14 @@
 export type UserState = 'lounge' | 'room';
 
+export type Facing = 'up' | 'down' | 'left' | 'right';
+
 export interface User {
   userId: string;
   name: string;
   state: UserState;
   x: number;
   y: number;
+  facing: Facing;
   roomId: string | null; // set when state === 'room'
 }
 
