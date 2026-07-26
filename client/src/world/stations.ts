@@ -5,10 +5,9 @@
  * stand, and the activity performed while parked there. The ambient loop in
  * `ambient.ts` picks stations and claims slots.
  *
- * `minigame` is the seam for the 1v1 games that come later: the ping pong table
- * already knows its own position, its two facing slots, and who is standing at
- * them, so wiring up pong is adding a handler — not retrofitting the lounge.
- * Nothing reads that field tonight.
+ * `minigame` is the seam for the 1v1 games: the ping pong table and arcade
+ * cabinet each know their own position and slots, and clicking them opens the
+ * matching game overlay — see Lounge.tsx.
  *
  * All coordinates are native pixels (see layout.ts). `footY` is the sprite's
  * bottom edge — it's the depth-sort key, so getting it wrong makes avatars walk
@@ -17,6 +16,7 @@
 
 import type { Px } from '../art/PixelCanvas';
 import {
+  arcadeCabinet,
   beanbag,
   bookshelf,
   coffeeBar,
@@ -55,8 +55,8 @@ export interface Station {
   slots: Slot[];
   /** ms range an avatar lingers here before wandering off. */
   dwell: [number, number];
-  /** Reserved for later 1v1 minigames. Inert tonight. */
-  minigame?: 'pong' | 'pool';
+  /** Which minigame this station opens, if any. */
+  minigame?: 'pong' | 'pool' | 'snake';
 }
 
 export const STATIONS: Station[] = [
@@ -106,6 +106,21 @@ export const STATIONS: Station[] = [
     ],
     dwell: [7000, 14000],
     minigame: 'pong',
+  },
+  {
+    id: 'arcade',
+    label: 'Arcade',
+    sprite: arcadeCabinet,
+    x: 182,
+    y: 96,
+    footY: 154,
+    activity: 'stand',
+    slots: [
+      { x: 199, y: 164, facing: 'up' },
+      { x: 172, y: 158, facing: 'right' },
+    ],
+    dwell: [6000, 14000],
+    minigame: 'snake',
   },
   {
     id: 'couch',

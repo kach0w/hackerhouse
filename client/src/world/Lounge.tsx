@@ -10,8 +10,11 @@
 
 import { useEffect, useRef, useState } from 'react';
 
+import { Pong } from '../games/pong/Pong';
+import { Snake } from '../games/snake/Snake';
 import { useSocket } from '../hooks/useSocket';
 import { LoungeStage } from './LoungeStage';
+import { STATIONS } from './stations';
 
 interface Props {
   /** Hands the stage up to App so the transition can drive scripted walks. */
@@ -23,13 +26,16 @@ interface Props {
 export function Lounge({ onStageReady, onGoToRoom }: Props) {
   const hostRef = useRef<HTMLDivElement>(null);
   const stageRef = useRef<LoungeStage | null>(null);
-  const { selfId, users, loungeUsers, rooms, sendMove, deniedRoomId, activeRooms } = useSocket();
+  const { selfId, self, users, loungeUsers, rooms, sendMove, deniedRoomId, activeRooms } =
+    useSocket();
 
   // Everyone but yourself, each with a room you can visit regardless of
   // whether they're currently sitting in it or out in the lounge.
   const others = users.filter((u) => u.userId !== selfId);
 
   const [toast, setToast] = useState<string | null>(null);
+  /** Which minigame overlay is open, if any. Driven by clicking a station. */
+  const [game, setGame] = useState<'pong' | 'snake' | null>(null);
 
   // Keep the latest callbacks and presence reachable from the Pixi loop without
   // re-creating the stage on every render.
@@ -49,8 +55,10 @@ export function Lounge({ onStageReady, onGoToRoom }: Props) {
     let disposed = false;
     const stage = new LoungeStage(host, {
       onSelfMove: (x, y, facing) => sendMoveRef.current(x, y, facing),
-      onStationClick: () => {
-        // Reserved for the 1v1 minigames. Intentionally inert tonight.
+      onStationClick: (stationId) => {
+        const station = STATIONS.find((s) => s.id === stationId);
+        if (station?.minigame === 'pong') setGame('pong');
+        else if (station?.minigame === 'snake') setGame('snake');
       },
     });
 
@@ -144,6 +152,23 @@ export function Lounge({ onStageReady, onGoToRoom }: Props) {
       </div>
 
       {toast && <div className="toast">{toast}</div>}
+
+      {/*
+        No transport passed, so this always runs practice-vs-bot. Wiring a
+        real 1v1 is swapping in a networked transport once there's a
+        `game:signal` socket event — the game and rendering code don't change.
+      */}
+      {game === 'pong' && (
+        <Pong
+          role="host"
+          names={{ left: self?.name ?? 'you', right: 'bot' }}
+          onClose={() => setGame(null)}
+        />
+      )}
+
+      {game === 'snake' && (
+        <Snake playerName={self?.name ?? 'you'} onClose={() => setGame(null)} />
+      )}
     </div>
   );
 }
