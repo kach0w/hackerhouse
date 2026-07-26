@@ -100,6 +100,15 @@
       pointer-events: none; transition: opacity 0.4s ease; z-index: 999;
     }
     #fade.active { opacity: 1; pointer-events: all; }
+
+    /* --- big bottom-center nav buttons (lounge <-> room) --- */
+    .big-nav-btn {
+      position: fixed; bottom: 40px; left: 50%; transform: translateX(-50%);
+      z-index: 20; font-size: 22px; padding: 18px 36px; border-radius: 10px;
+      background: #2d6; color: #111; border: none; cursor: pointer; font-weight: bold;
+      box-shadow: 0 4px 14px rgba(0,0,0,0.5);
+    }
+    .big-nav-btn:hover { background: #3e8; }
   </style>
 </head>
 <body>
@@ -109,7 +118,6 @@
   <div id="loungeView" class="view active">
     <div id="bar">
       <strong>the lounge</strong>
-      <button id="toRoomBtn">walk to your room →</button>
       <span id="status">2 others here (placeholder)</span>
     </div>
     <div class="floor"></div>
@@ -122,12 +130,12 @@
     <div class="avatar" id="other1" style="left: 150px; top: 120px;"><span class="label">alex</span>a</div>
     <div class="avatar" id="other2" style="left: 450px; top: 300px;"><span class="label">sam</span>s</div>
     <div class="door" style="left: 700px; top: 400px;" id="doorToRoom">stairs ↑</div>
+    <button id="toRoomBtn" class="big-nav-btn">walk to your room →</button>
   </div>
 
   <!-- ROOM VIEW -->
   <div id="roomView" class="view">
     <div id="bar">
-      <button id="toLoungeBtn">head to the lounge</button>
       <span id="shareControls">
         <button id="createBtn">create room</button>
         <input id="joinId" placeholder="room id to join" />
@@ -137,6 +145,7 @@
       </span>
       <span id="roomStatus"></span>
     </div>
+    <button id="toLoungeBtn" class="big-nav-btn">head to the lounge</button>
     <div id="links"></div>
     <div id="agentOnboard" class="agent-onboard hidden">
       <p>Get your terminal started — this happens once, ever, on this machine.</p>
