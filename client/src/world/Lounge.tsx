@@ -117,13 +117,17 @@ export function Lounge({ onStageReady, onGoToRoom }: Props) {
                   onClick={() => onGoToRoom(u.userId)}
                 >
                   <span className="room-roster-name">
-                    {agentRunning && (
-                      <span className="room-roster-agent-dot" title="agent running" />
-                    )}
+                    {agentRunning && <span className="room-roster-agent-dot" />}
                     {u.name}
                   </span>
-                  <span className="room-roster-status">
-                    {locked ? '🔒' : u.state === 'room' ? 'at desk →' : 'in lounge →'}
+                  <span className={`room-roster-status${agentRunning ? ' is-running' : ''}`}>
+                    {agentRunning
+                      ? 'running claude'
+                      : locked
+                        ? '🔒'
+                        : u.state === 'room'
+                          ? 'at desk →'
+                          : 'in lounge →'}
                   </span>
                 </button>
               );

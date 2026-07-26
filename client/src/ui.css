@@ -192,6 +192,11 @@ body {
   color: var(--muted);
 }
 
+.room-roster-status.is-running {
+  color: #4ea86b;
+  font-weight: 700;
+}
+
 .room-roster-name {
   display: inline-flex;
   align-items: center;
