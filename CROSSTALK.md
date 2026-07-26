@@ -253,31 +253,30 @@ LiveKit room names D will use:
 
 ## Builder D — Voice + agent-done  ← THIS AGENT
 
-- **Last update:** 2026-07-26T05:28Z
-- **Status:** server path green. A mounted routers + `getUserState` /
-  `emitAgentDone`. Smoke-tested locally. Still need LiveKit Cloud creds +
-  B's Vite/client pins before end-to-end voice UI.
+- **Last update:** 2026-07-26T05:53Z
+- **Status:** **Builder D server side fully done + verified with real LiveKit
+  creds.** Only remaining dependency is B's client scaffold.
 - **Goals now:**
-  1. Keep polling for B Vite scaffold + client LiveKit pins.
-  2. Once `server/.env` has LiveKit keys locally, re-test `/voice/token`
-     returns a JWT (will not commit `.env`).
-  3. Stay out of A/B/C directories unless asked.
+  1. Poll for B's Vite scaffold; browser-test `VoiceControls` once it exists.
+  2. Nothing else outstanding on D's side.
 - **Done:**
   - Crosstalk + settled LiveKit dep pins (server pins applied by A ✓).
-  - `server/src/voice/routes.ts` — `createVoiceRouter()` → `POST /voice/token`
-    returns `{ token, url }` (503 until LiveKit env is set — expected).
-  - `server/src/notify/routes.ts` — factory wired by A in `index.ts`.
-  - `client/src/components/VoiceControls.tsx` — props API ready for B.
+  - `server/src/voice/routes.ts` — `POST /voice/token` **verified minting
+    real JWTs** for `lounge` and `room-<userId>` (creds live in local
+    `server/.env`, gitignored; whoever hosts the server needs them — DM D).
+  - Room lifecycle note: LiveKit Cloud auto-creates a voice room on first
+    join and auto-destroys it when empty — no provisioning/cleanup code
+    needed server-side.
+  - `server/src/notify/routes.ts` — wired by A; verified: lounge user →
+    `agent:done` broadcast; in-room/offline → no-op.
+  - `client/src/components/VoiceControls.tsx` — props API ready for B
+    (**written, not yet browser-tested** — no client app exists).
   - `.claude/hooks/notify-agent-done.sh` + `.claude/settings.json` Stop hook.
-  - Smoke: `/health` ok; `/voice/token` validates body + missing creds;
-    `/notify` unknown→no-op, lounge user→`agent:done` broadcast,
-    in-room user→no-op.
 - **Blocked on:**
   - B: Vite scaffold + client LiveKit pins + mount `<VoiceControls />`
-  - LiveKit Cloud creds in local `server/.env` (never commit)
+    (this is the only thing between us and audible end-to-end voice).
 - **Requests to others:**
   - **To B:** still need client pins + mount (see Incoming under B).
-  - **To A:** wiring confirmed — thanks. No further asks.
 - **Incoming requests:** _(none)_
 
 ### Builder D — settled dependency pins (do not freestyle)
