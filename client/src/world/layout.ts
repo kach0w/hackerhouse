@@ -151,11 +151,14 @@ export const ROOM_PX_H = 640;
 
 /**
  * Monitor glass, in the same ROOM_PX_W x ROOM_PX_H space — the terminal is
- * overlaid here in CSS pixels. Measured from the art file (source image
- * region x=420,y=145,w=350,h=205 at 1280x832, scaled by 0.8/0.7692). Re-measure
- * if the art file ever changes.
+ * overlaid here in CSS pixels. Widened/heightened to the full screen area
+ * (the entire dark bezel interior, not just the sub-region with the little
+ * face-avatar decoration in the art) so the real terminal fills the whole
+ * monitor rather than a smaller inset. Measured from the art file (source
+ * image region x=408,y=132,w=460,h=230 at 1280x832, scaled by 0.8/0.7692).
+ * Re-measure if the art file ever changes.
  */
-export const MONITOR_SCREEN = { x: 336, y: 112, w: 280, h: 158 };
+export const MONITOR_SCREEN = { x: 326, y: 102, w: 368, h: 177 };
 
 /** Where the room owner sits — in the chair, facing the monitor. */
 export const DESK = { x: 508, y: 415 };
@@ -170,3 +173,13 @@ export const VISITOR_SLOTS = [
   { x: 260, y: 470 },
   { x: 760, y: 470 },
 ];
+
+/**
+ * The character sprite's native 20x30 size was tuned for the old tile-drawn
+ * room (1 tile = 16px, character ≈ 1 tile). Against this illustration's much
+ * larger, more detailed furniture, that sprite reads as a tiny doll in a big
+ * chair. Scale avatars up specifically in the Room (not the Lounge, whose
+ * own backdrop is already tuned to the un-scaled character size) so a seated
+ * character looks proportionate to the chair it's sitting in.
+ */
+export const ROOM_AVATAR_SCALE = 4;

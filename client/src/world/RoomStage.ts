@@ -20,6 +20,7 @@ import {
   ARRIVE_EPS,
   DESK,
   MONITOR_SCREEN,
+  ROOM_AVATAR_SCALE,
   ROOM_DOOR,
   ROOM_PX_H,
   ROOM_PX_W,
@@ -135,6 +136,7 @@ export class RoomStage {
         // Added to sortLayer, which sits on top of the whole backdrop image
         // — a new arrival just appears standing in the scene, not baked in.
         av = new Avatar(u.userId, u.name);
+        av.scale.set(ROOM_AVATAR_SCALE);
         this.avatars.set(u.userId, av);
         this.sortLayer.addChild(av);
         av.position.set(ROOM_DOOR.x, ROOM_DOOR.y);
