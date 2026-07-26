@@ -275,6 +275,95 @@ export function deskMonitor(): Px {
   return p;
 }
 
+/**
+ * The big monitor the room is built around. Draws only the bezel, stand and
+ * glow — the interior is left transparent because the real xterm terminal is
+ * positioned over it in the DOM. `screen` must match MONITOR_SCREEN in
+ * layout.ts, or the bezel and the terminal will disagree.
+ */
+export function monitorFrame(
+  w: number,
+  h: number,
+  screen: { x: number; y: number; w: number; h: number },
+): Px {
+  const p = new Px(w, h + 22);
+
+  // Bezel.
+  p.rect(0, 0, w, h, METAL.dark);
+  p.rect(0, 0, w, 2, METAL.light);
+  p.rect(0, 0, 2, h, shade(METAL.dark, 0.12));
+  p.rect(w - 2, 0, 2, h, shade(METAL.dark, -0.25));
+  p.rect(0, h - 3, w, 3, shade(METAL.dark, -0.3));
+
+  // Inner lip around the glass, then punch the glass out.
+  p.rect(screen.x - 2, screen.y - 2, screen.w + 4, screen.h + 4, '#0a0d12');
+  for (let y = 0; y < screen.h; y++) {
+    for (let x = 0; x < screen.w; x++) p.set(screen.x + x, screen.y + y, null);
+  }
+
+  // Power LED + brand nub on the chin.
+  p.rect(w / 2 - 8, h - 8, 16, 2, shade(METAL.dark, 0.2));
+  p.rect(w - 14, h - 8, 3, 3, '#5fd6a0');
+
+  // Stand.
+  p.rect(w / 2 - 10, h, 20, 12, METAL.base);
+  p.rect(w / 2 - 10, h, 3, 12, METAL.light);
+  p.rect(w / 2 - 30, h + 12, 60, 6, METAL.base);
+  p.rect(w / 2 - 30, h + 12, 60, 2, METAL.light);
+  p.rect(w / 2 - 30, h + 18, 60, 2, shade(METAL.dark, -0.2));
+
+  p.outline(OUTLINE);
+  return p;
+}
+
+/** Wide desk slab for the room. */
+export function deskSlab(w: number, h: number): Px {
+  const p = new Px(w, h + 18);
+
+  // Legs.
+  p.rect(6, h - 2, 6, 20, shade(WOOD.dark, -0.35));
+  p.rect(w - 12, h - 2, 6, 20, shade(WOOD.dark, -0.35));
+
+  // Top surface + front edge.
+  p.rect(0, 0, w, h - 8, WOOD.base);
+  p.rect(0, 0, w, 3, WOOD.light);
+  p.rect(0, h - 8, w, 8, shade(WOOD.dark, -0.1));
+  p.hline(0, h - 8, w, shade(WOOD.dark, -0.3));
+
+  // Grain.
+  for (let i = 1; i < 5; i++) p.hline(10, 5 + i * 4, w - 20, shade(WOOD.base, -0.05));
+
+  // Clutter: keyboard, mouse, mug, notebook.
+  p.rect(w / 2 - 34, h - 22, 68, 11, shade(METAL.base, -0.15));
+  p.rect(w / 2 - 34, h - 22, 68, 2, METAL.light);
+  p.dither(w / 2 - 31, h - 19, 62, 6, METAL.light, 0);
+  p.rect(w / 2 + 42, h - 20, 9, 7, shade(METAL.base, -0.05));
+  p.rect(w / 2 - 60, h - 22, 9, 10, '#d64a3f');
+  p.rect(w / 2 - 59, h - 23, 7, 1, shade('#d64a3f', 0.3));
+  p.rect(w / 2 + 58, h - 21, 16, 10, '#e8e4dc');
+  p.hline(w / 2 + 60, h - 18, 12, '#7a869c');
+  p.hline(w / 2 + 60, h - 15, 9, '#7a869c');
+
+  p.outline(OUTLINE);
+  return p;
+}
+
+/** Desk chair, drawn from behind — the avatar sits in front of it. */
+export function deskChair(): Px {
+  const p = new Px(40, 46);
+  p.rect(6, 0, 28, 26, '#3a4152');
+  p.rect(6, 0, 28, 3, '#4c556b');
+  p.rect(8, 4, 24, 3, shade('#3a4152', -0.2));
+  p.rect(8, 12, 24, 3, shade('#3a4152', -0.2));
+  p.rect(16, 26, 8, 8, METAL.dark);
+  p.rect(4, 34, 32, 5, METAL.base);
+  p.rect(4, 34, 32, 2, METAL.light);
+  p.circle(7, 42, 3, METAL.dark);
+  p.circle(33, 42, 3, METAL.dark);
+  p.outline(OUTLINE);
+  return p;
+}
+
 export function deskTable(): Px {
   const p = new Px(76, 28);
 

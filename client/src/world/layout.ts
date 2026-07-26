@@ -71,28 +71,59 @@ export function facingFromDelta(dx: number, dy: number): 'up' | 'down' | 'left' 
 
 // --- Room scene geometry -----------------------------------------------------
 
-/** The room scene occupies the bottom quarter of the viewport. */
-export const ROOM_SPLIT = 0.25;
+/**
+ * The room fills the whole viewport. Your avatar sits at a desk with a large
+ * monitor, and the real terminal is positioned exactly over that monitor's
+ * screen — so the agent is running on the machine your character is using,
+ * rather than in a panel bolted above the scene.
+ */
+/**
+ * The room is a large tilemap that the camera sits *inside*, rather than a
+ * fixed picture scaled to fit. Letterboxing a fixed room meant a tall window
+ * showed a small rectangle floating in black; this way the floor and walls
+ * always run to the edges of the screen at a clean integer zoom.
+ */
+export const ROOM_PX_W = 1024;
+export const ROOM_PX_H = 640;
 
-/** Room interior, native px. Wider than tall — it's a letterboxed strip. */
-export const ROOM_PX_W = 320;
-export const ROOM_PX_H = 104;
+/** Everything above this line is wall, everything below is floor. */
+export const ROOM_FLOOR_TOP = 256;
+export const ROOM_WALL_ROWS = ROOM_FLOOR_TOP / TILE;
 
-export const ROOM_WALL_ROWS = 2;
-export const ROOM_FLOOR_TOP = ROOM_WALL_ROWS * TILE;
+/** The desk composition is centred on this column. */
+export const ROOM_CX = 512;
+
+/** What the camera looks at, and roughly the minimum area kept visible. */
+/**
+ * Camera target: the midpoint of the composition (monitor top ~120 down to the
+ * chair ~352), so the whole desk setup stays framed rather than clipping the
+ * top of the bezel.
+ */
+export const ROOM_FOCUS = { x: ROOM_CX, y: 240 };
+export const ROOM_VIEW_W = 420;
+export const ROOM_VIEW_H = 300;
+
+/** Monitor bezel footprint, native px. */
+export const MONITOR = { x: ROOM_CX - 104, y: 120, w: 208, h: 132 };
 
 /**
- * Where the room owner sits. Deliberately *above* the desk's sort line so the
- * desk renders in front of them — from overhead, someone working sits on the
- * far side of their desk, not on top of it.
+ * The glass — the terminal is overlaid here in CSS pixels. Keep this in sync
+ * with `monitorFrame()` in art/props.ts: the sprite draws the bezel around this
+ * rect and leaves the interior empty so the DOM terminal shows through.
  */
-export const DESK = { x: 140, y: 76 };
-export const ROOM_DOOR = { x: 28, y: 88 };
+export const MONITOR_SCREEN = { x: ROOM_CX - 94, y: 130, w: 188, h: 104 };
 
-/** Where visiting avatars stand once they've walked in. */
+/** Desk slab under the monitor. */
+export const DESK_TOP = { x: ROOM_CX - 124, y: 252, w: 248, h: 34 };
+
+/** Where the room owner sits — in front of the desk, back to the viewer. */
+export const DESK = { x: ROOM_CX, y: 332 };
+export const ROOM_DOOR = { x: ROOM_CX - 212, y: 300 };
+
+/** Where visiting avatars stand once they've walked in — off to the side. */
 export const VISITOR_SLOTS = [
-  { x: 196, y: 82 },
-  { x: 220, y: 94 },
-  { x: 244, y: 82 },
-  { x: 268, y: 94 },
+  { x: ROOM_CX + 132, y: 330 },
+  { x: ROOM_CX + 168, y: 350 },
+  { x: ROOM_CX - 132, y: 330 },
+  { x: ROOM_CX - 168, y: 350 },
 ];

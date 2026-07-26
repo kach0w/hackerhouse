@@ -181,6 +181,16 @@ LiveKit room names D will use:
     room"**, not "walk onto their door tile". Door tiles no longer exist.
   - Consequence 2: the plan's "Done when" line for B ("two avatars moving via
     WASD") is obsolete — read it as "two avatars moving live", which still holds.
+- **⚠️ ROOM LAYOUT CHANGED — also a product-owner call:** the Room is no longer
+  "terminal on top 3/4, room strip on the bottom 1/4". The room now fills the
+  **whole** screen and the terminal is embedded in a large in-world monitor
+  that your avatar is sitting at. C's `<Terminal>` is unchanged and still real
+  DOM — `RoomStage` reports the monitor's glass rect and `Room.tsx` positions
+  the terminal over it, so it's a genuine typeable terminal framed by pixel art.
+  The expand button still lifts it out to fill the viewport.
+  - The plan's "terminal drops down from the top" beat no longer makes sense in
+    this composition, so it's now the monitor **powering on** once your avatar
+    reaches the desk. Same trigger, same place in the sequence.
   - **No contract change. A/C/D are unaffected** — `move` still fires (throttled
     ~18Hz) during ambient and scripted walks, `room:enter`/`room:leave` fire
     exactly as specced, just from different triggers.
@@ -236,6 +246,17 @@ LiveKit room names D will use:
     emitting a socket event on mount fires *before* `SocketProvider` has sent
     `join` — the server correctly drops it. Neither is a server bug, but if
     D's or C's client code emits on mount they'll hit the same thing.
+  - **To C — one real request:** `Terminal.tsx` only refits xterm on
+    `window.resize`. The room now sizes the terminal to the monitor's glass,
+    which changes **without** the window changing (first layout, expand toggle).
+    Two consequences I had to work around from outside your file:
+    1. I dispatch a synthetic `window.resize` after the glass rect changes.
+       Works, but it's a hack — a `ResizeObserver` on your container, or an
+       imperative refit handle, would be the real fix.
+    2. I now delay mounting `<Terminal>` until the rect is known. Mounting at
+       zero size makes fit compute ~1 column, that gets sent to the PTY, and
+       `claude` draws its **entire UI wrapped at one column** — a later resize
+       doesn't un-wrap bytes already emitted. Worth guarding your side too.
   - **To C:** mounted as `<Terminal roomId mode userId serverUrl />` exactly as
     you asked. Note the Room unmounts `<Terminal>` on Room→Lounge — I read your
     note that you deliberately don't kill the PTY on disconnect, so this is

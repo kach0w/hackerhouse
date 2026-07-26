@@ -194,41 +194,48 @@ body {
 /* --- Room view ------------------------------------------------------------- */
 
 .room-scene {
-  display: flex;
-  flex-direction: column;
   background: #0b0d12;
 }
 
-.terminal-pane {
-  position: relative;
-  flex: 0 0 75%;
-  min-height: 0;
-  transform: translateY(-100%);
-  transition: transform 520ms cubic-bezier(0.22, 0.68, 0.24, 1);
+/*
+ * The real terminal, positioned over the monitor's glass. The rect comes from
+ * RoomStage, which derives it from MONITOR_SCREEN and the world transform — so
+ * it tracks the pixel art exactly at any window size.
+ */
+.monitor-screen {
+  position: absolute;
+  overflow: hidden;
+  background: #0a0d12;
+  /* Powering on: the picture snaps open vertically, like a CRT waking up. */
+  transform: scaleY(0.02);
+  opacity: 0;
+  transition:
+    transform 420ms cubic-bezier(0.2, 0.9, 0.25, 1),
+    opacity 260ms ease-out;
 }
 
-.terminal-pane.is-in {
-  transform: translateY(0);
+.monitor-screen.is-on {
+  transform: scaleY(1);
+  opacity: 1;
+  box-shadow:
+    0 0 0 1px rgba(127, 227, 192, 0.12),
+    0 0 60px rgba(127, 227, 192, 0.07);
 }
 
-.room-pane {
-  position: relative;
-  flex: 1 1 25%;
-  min-height: 0;
-  border-top: 2px solid #000;
-}
-
-.room-scene.is-expanded .terminal-pane {
-  flex-basis: 100%;
-}
-
-.room-scene.is-expanded .room-pane {
-  display: none;
+/* Expanded lifts the terminal out of the monitor to fill the viewport. */
+.room-scene.is-expanded .monitor-screen {
+  inset: 0;
+  left: 0;
+  top: 0;
+  width: 100%;
+  height: 100%;
+  box-shadow: none;
 }
 
 .room-bar {
   position: absolute;
   inset: auto 0 0 0;
+  z-index: 4;
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -263,9 +270,9 @@ body {
 
 /* --- Builder C's terminal -------------------------------------------------- */
 
-.terminal-pane .xterm {
+.monitor-screen .xterm {
   height: 100%;
-  padding: 8px 12px;
+  padding: 6px 8px;
 }
 
 /* Shown instead of C's terminal when there's no server to attach a PTY to. */
