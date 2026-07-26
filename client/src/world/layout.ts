@@ -158,20 +158,20 @@ export const ROOM_PX_H = 640;
  * image region x=408,y=132,w=460,h=230 at 1280x832, scaled by 0.8/0.7692).
  * Re-measure if the art file ever changes.
  */
-export const MONITOR_SCREEN = { x: 326, y: 102, w: 368, h: 177 };
+export const MONITOR_SCREEN = { x: 326, y: 102, w: 368, h: 220 };
 
 /** Where the room owner sits — in the chair, facing the monitor. */
-export const DESK = { x: 508, y: 415 };
+export const DESK = { x: 508, y: 500 };
 
 /** Where an arriving avatar starts, roughly at the door in the art. */
 export const ROOM_DOOR = { x: 64, y: 462 };
 
 /** Where visiting avatars stand once they've walked in — open floor either side. */
 export const VISITOR_SLOTS = [
-  { x: 220, y: 500 },
-  { x: 800, y: 500 },
-  { x: 260, y: 470 },
-  { x: 760, y: 470 },
+  { x: 220, y: 560 },
+  { x: 800, y: 560 },
+  { x: 260, y: 530 },
+  { x: 760, y: 530 },
 ];
 
 /**

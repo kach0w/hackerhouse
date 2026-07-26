@@ -156,6 +156,15 @@ export function Room({
     <div className={`scene room-scene${expanded ? ' is-expanded' : ''}`} ref={sceneRef}>
       <div className="canvas-host" ref={hostRef} />
 
+      {!expanded && (
+        <div className="hud hud-topleft">
+          <div className="hud-title">THE ROOM</div>
+          <div className="hud-sub">
+            {isOwner ? 'your desk' : `${owner?.name ?? roomId}'s desk`}
+          </div>
+        </div>
+      )}
+
       <div
         className={`monitor-screen${terminalVisible ? ' is-on' : ''}`}
         style={screenStyle}
@@ -181,7 +190,7 @@ export function Room({
         )}
 
         <button
-          className="monitor-fullscreen-btn"
+          className="btn btn-icon monitor-fullscreen-btn"
           title={expanded ? 'Exit fullscreen' : 'Fullscreen the terminal'}
           onClick={toggleFullscreen}
         >
