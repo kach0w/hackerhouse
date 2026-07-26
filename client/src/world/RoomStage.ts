@@ -11,7 +11,7 @@
  * glass sits in the image — keep it in sync if the art file changes.
  */
 
-import { Application, Assets, Container, Sprite } from 'pixi.js';
+import { Application, Assets, Container, Graphics, Sprite } from 'pixi.js';
 
 import roomBackgroundUrl from '../assets/room-background.jpeg';
 import type { User } from '@hackerhouse/shared';
@@ -221,5 +221,16 @@ export class RoomStage {
     sprite.width = ROOM_PX_W;
     sprite.height = ROOM_PX_H;
     this.floorLayer.addChild(sprite);
+
+    // Paint solid black over the whole screen area, on the canvas itself —
+    // not just relying on the DOM terminal div lining up pixel-perfectly
+    // with the art's illustrated screen (which has its own baked-in colors:
+    // a lighter blue profile-icon panel, corgi art, etc.). This guarantees a
+    // clean black monitor regardless of any small DOM/canvas misalignment;
+    // the real terminal then sits on top of black, not on top of the image.
+    const blackout = new Graphics();
+    blackout.rect(MONITOR_SCREEN.x, MONITOR_SCREEN.y, MONITOR_SCREEN.w, MONITOR_SCREEN.h);
+    blackout.fill(0x000000);
+    this.floorLayer.addChild(blackout);
   }
 }
