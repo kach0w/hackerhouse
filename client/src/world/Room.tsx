@@ -218,14 +218,6 @@ export function Room({
             </button>
           )}
 
-          <button
-            className="btn btn-icon"
-            title={expanded ? 'Exit fullscreen' : 'Fullscreen the terminal'}
-            onClick={toggleFullscreen}
-          >
-            {expanded ? '🗗' : '⛶'}
-          </button>
-
           <button className="btn btn-primary" onClick={onLeave}>
             Head to the lounge
           </button>
