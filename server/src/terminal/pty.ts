@@ -1,18 +1,82 @@
 import fs from 'node:fs';
 import path from 'node:path';
+import { fileURLToPath } from 'node:url';
 import pty, { type IPty } from 'node-pty';
 
 const BUFFER_CAP = 10_000;
 
-// Demo-only "collaborative coding": each room gets its own pre-made clone/
-// branch of a real project at ~/demo/<roomId>, so different rooms' real
-// Claude Code sessions are genuinely editing different working copies of
-// the same repo instead of colliding in one shared directory. Falls back to
-// $HOME if that folder hasn't been set up (e.g. in dev, or a room whose
-// owner doesn't have a pre-made demo folder).
+// server/src/terminal/pty.ts → repo root (where .claude/ lives)
+const REPO_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../../..');
+const HOOK_SRC = path.join(REPO_ROOT, '.claude/hooks/notify-agent-done.sh');
+
+/**
+ * Always give each room its own working dir under ~/demo/<roomId>.
+ * Creating it (instead of falling back to $HOME) means we can install a
+ * project-local Claude Stop hook without touching the user's home
+ * ~/.claude/settings.json.
+ */
 function resolveCwd(roomId: string): string {
   const demoDir = path.join(process.env.HOME ?? '', 'demo', roomId);
-  return fs.existsSync(demoDir) ? demoDir : process.env.HOME ?? process.cwd();
+  fs.mkdirSync(demoDir, { recursive: true });
+  return demoDir;
+}
+
+/**
+ * Claude Code only loads project Stop hooks from the cwd's .claude/.
+ * Host-spawned and local-agent Claudes both use ~/demo/<roomId>, which is
+ * outside this repo — so copy the notify hook in and point settings at it
+ * with an absolute path. Idempotent; refreshes the script from the repo
+ * copy on every spawn so hook fixes propagate.
+ */
+function ensureNotifyHook(cwd: string): void {
+  if (!fs.existsSync(HOOK_SRC)) {
+    console.warn(`[terminal] notify hook missing at ${HOOK_SRC} — agent-done will not fire`);
+    return;
+  }
+
+  try {
+    const hooksDir = path.join(cwd, '.claude', 'hooks');
+    fs.mkdirSync(hooksDir, { recursive: true });
+
+    const hookDest = path.join(hooksDir, 'notify-agent-done.sh');
+    fs.copyFileSync(HOOK_SRC, hookDest);
+    fs.chmodSync(hookDest, 0o755);
+
+    const settingsPath = path.join(cwd, '.claude', 'settings.json');
+    let settings: Record<string, unknown> = {};
+    if (fs.existsSync(settingsPath)) {
+      try {
+        settings = JSON.parse(fs.readFileSync(settingsPath, 'utf8')) as Record<string, unknown>;
+      } catch {
+        settings = {};
+      }
+    }
+
+    // Absolute path so this works even if Claude's project root != cwd.
+    const escaped = hookDest.replace(/'/g, `'\\''`);
+    const prevHooks =
+      settings.hooks && typeof settings.hooks === 'object'
+        ? (settings.hooks as Record<string, unknown>)
+        : {};
+
+    settings.hooks = {
+      ...prevHooks,
+      Stop: [
+        {
+          hooks: [
+            {
+              type: 'command',
+              command: `bash '${escaped}'`,
+            },
+          ],
+        },
+      ],
+    };
+
+    fs.writeFileSync(settingsPath, `${JSON.stringify(settings, null, 2)}\n`);
+  } catch (err) {
+    console.warn('[terminal] failed to install notify Stop hook:', (err as Error).message);
+  }
 }
 
 interface TerminalSession {
@@ -31,9 +95,14 @@ function appendToBuffer(session: TerminalSession, chunk: string) {
  * host spawns for itself. The local agent (running on someone else's
  * machine entirely) passes its own reachable server URL instead, so that
  * machine's Stop hook posts /notify to the right place.
+ *
+ * Used by both:
+ *   - host-spawned terminals (`getOrCreateSession`)
+ *   - `npm run agent` on an owner's machine (`agent.ts`)
  */
 export function spawnClaudeOrFallback(roomId: string, serverUrl?: string): IPty {
   const cwd = resolveCwd(roomId);
+  ensureNotifyHook(cwd);
   console.log(`[terminal] room ${roomId} -> cwd ${cwd}`);
   const opts = {
     name: 'xterm-color',
