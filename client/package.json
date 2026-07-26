@@ -1,0 +1,8 @@
+{
+  "name": "@hackerhouse/client",
+  "version": "0.0.0",
+  "private": true,
+  "scripts": {
+    "dev": "echo \"client not scaffolded yet\" && exit 1"
+  }
+}

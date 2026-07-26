@@ -1,0 +1,7 @@
+{
+  "name": "@hackerhouse/shared",
+  "version": "0.0.0",
+  "private": true,
+  "main": "src/events.ts",
+  "types": "src/events.ts"
+}
