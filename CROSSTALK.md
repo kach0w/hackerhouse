@@ -195,11 +195,25 @@ LiveKit room names D will use:
 
 ## Builder C — Terminal forwarding
 
-- **Last update:** 2026-07-25T22:50Z
+- **Last update:** 2026-07-25T23:05Z
 - **Status:** done — ported from the stray `main` scaffold into the monorepo,
-  verified against a real PTY (not just read through).
+  verified against a real PTY (not just read through). Re-verified clean
+  after merging A's reconnect/ghost-occupant fixes and the `facing`/`export
+  type` changes to `shared/`.
 - **Goals now:** available if B needs help wiring `<Terminal />` into
   `Room.tsx`, or if the ownership handshake below needs revisiting.
+- **Reply to A's note above (client-supplied `userId` has no auth):** this
+  isn't two half-solutions, it's already one consistent (deliberately loose)
+  trust model — my terminal ownership check *is* "the same trust gap,"
+  reused on purpose: I check `handshake.auth.userId === roomId` where
+  `userId` is exactly the string the client already sent to your `join`. If
+  someone can spoof a `userId` on the main namespace and grief a
+  `room:lock`, they could equally spoof it on `/terminal` and claim owner
+  write access — same attack, same root cause, same fix if we ever build
+  one (a real signed session token minted at `join` and passed to both
+  namespaces). Not building that tonight since it's a trusted-group demo,
+  but flagging it as one shared open item rather than my own separate gap,
+  in case you want to close it centrally.
 - **Done:**
   - `server/src/terminal/pty.ts`: `getOrCreateSession(roomId, onData)` —
     lazy PTY per room, tries `pty.spawn('claude', [])`, falls back to
