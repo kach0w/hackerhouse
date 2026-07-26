@@ -34,7 +34,11 @@ function spawnClaudeOrFallback(roomId: string): IPty {
     cols: 100,
     rows: 30,
     cwd,
-    env: process.env as Record<string, string>,
+    env: {
+      ...(process.env as Record<string, string>),
+      HACKERHOUSE_SERVER_URL: `http://localhost:${process.env.PORT ?? '3001'}`,
+      HACKERHOUSE_USER_ID: roomId,
+    },
   };
   try {
     return pty.spawn('claude', [], opts);
