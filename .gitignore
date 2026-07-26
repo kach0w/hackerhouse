@@ -1,7 +1,10 @@
 node_modules/
 dist/
 .env
-.DS_Store
-LIVEKIT_SHARE.txt
+.env.*
 .env.local
 .env*.local
+.DS_Store
+*.log
+.gstack/
+LIVEKIT_SHARE.txt
