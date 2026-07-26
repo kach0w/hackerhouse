@@ -159,12 +159,57 @@ LiveKit room names D will use:
 
 ## Builder C — Terminal forwarding
 
-- **Last update:** _(none yet)_
-- **Status:** not started / waiting
-- **Goals now:**
+- **Last update:** 2026-07-25T22:50Z
+- **Status:** done — ported from the stray `main` scaffold into the monorepo,
+  verified against a real PTY (not just read through).
+- **Goals now:** available if B needs help wiring `<Terminal />` into
+  `Room.tsx`, or if the ownership handshake below needs revisiting.
 - **Done:**
-- **Blocked on:**
+  - `server/src/terminal/pty.ts`: `getOrCreateSession(roomId, onData)` —
+    lazy PTY per room, tries `pty.spawn('claude', [])`, falls back to
+    `$SHELL` with a loud `console.warn` if `claude` isn't resolvable. Output
+    buffer capped at 10k chars for late-joiner replay.
+  - `server/src/terminal/socket.ts`: `registerTerminalNamespace(io)` — `/terminal`
+    namespace, `terminal:join/input/resize` + `terminal:output/ready` exactly
+    per `shared/src/events.ts`. **Ownership mechanism (simplified from the
+    plan, flagging here per the coordination note):** instead of a signed
+    token or a call into A's presence state, the client passes `{ auth:
+    { userId } }` on socket connect, and the server just checks `userId ===
+    roomId` (our existing `roomId === ownerId` convention). Same userId the
+    client already uses to `join` the main namespace — no new identity
+    system, no cross-namespace lookup. `terminal:input`/`resize` are dropped
+    silently (no error emitted) if that check fails.
+  - Wired into `server/src/index.ts` (the one-line `registerTerminalNamespace(io)`
+    that was already stubbed in as a comment).
+  - `client/src/components/Terminal.tsx`: props `{ roomId, mode, userId,
+    serverUrl }`, `@xterm/xterm` + `@xterm/addon-fit` + `socket.io-client`.
+    Owner mode wires `onData` -> `terminal:input`; visitor mode attaches no
+    input handler at all. **Not yet visually tested** — `client/` isn't
+    scaffolded (Vite/React/xterm deps don't exist yet), so this compiles by
+    inspection against the shared types but hasn't run in a browser.
+  - `server/src/terminal/verify.ts` (`npm run verify:terminal --workspace
+    server`): boots the real server, drives an owner + visitor connection
+    through join -> buffer replay -> input isolation -> owner round-trip
+    against a real spawned `claude`/$SHELL PTY. **All 4 checks pass.**
+  - `npx tsc --noEmit` in `server/` is clean.
+  - Known env gotcha (hit this for real, save yourself the hour): on macOS,
+    `node-pty`'s prebuilt `spawn-helper` binary can lose its executable bit
+    on install, causing `posix_spawnp failed`. Fix: `chmod +x
+    node_modules/node-pty/prebuilds/*/spawn-helper`.
+  - Deliberately **not** killing the PTY on socket disconnect — only the
+    underlying process exiting removes the session. The whole point of the
+    app is that leaving Room -> Lounge (which will unmount `<Terminal />`
+    and disconnect this socket) must not kill your agent run.
+- **Blocked on:** nothing for my own piece. `client/` needs to actually be
+  scaffolded (Vite + React + the xterm/socket.io-client deps) before
+  `Terminal.tsx` gets a real render/interaction test.
 - **Requests to others:**
+  - **To B:** when you scaffold Vite, please add `@xterm/xterm` and
+    `@xterm/addon-fit` to `client/package.json` alongside D's LiveKit pins
+    and `socket.io-client` — `Terminal.tsx` imports them. Mount it as
+    `<Terminal roomId={roomId} mode={isOwner ? 'owner' : 'visitor'}
+    userId={userId} serverUrl={HTTP_BASE} />`, same pattern as D's
+    `VoiceControls`.
 - **Incoming requests:**
   - _(none from D beyond shared contract)_
 

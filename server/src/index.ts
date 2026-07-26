@@ -7,6 +7,7 @@ import type { ClientToServerEvents, ServerToClientEvents } from '@hackerhouse/sh
 import { registerPresenceHandlers, getUserState, emitAgentDone } from './state/socket.js';
 import { createVoiceRouter } from './voice/routes.js';
 import { createNotifyRouter } from './notify/routes.js';
+import { registerTerminalNamespace } from './terminal/socket.js';
 
 const PORT = Number(process.env.PORT ?? 3001);
 const CLIENT_ORIGIN = process.env.CLIENT_ORIGIN ?? '*';
@@ -30,9 +31,7 @@ registerPresenceHandlers(io);
 app.use(createVoiceRouter());
 app.use(createNotifyRouter({ getUserState, emitAgentDone }));
 
-// Builder C mounts the /terminal namespace here once server/src/terminal/socket.ts exists:
-//   import { registerTerminalNamespace } from './terminal/socket.js';
-//   registerTerminalNamespace(io);
+registerTerminalNamespace(io);
 
 httpServer.listen(PORT, () => {
   console.log(`server listening on :${PORT}`);
