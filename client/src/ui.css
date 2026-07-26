@@ -464,9 +464,10 @@ body {
 
 /* --- Builder C's terminal -------------------------------------------------- */
 
+/* Edge-to-edge in the TV glass — Claude's own TUI draws its chrome inside. */
 .monitor-screen .xterm {
   height: 100%;
-  padding: 6px 8px;
+  padding: 0 !important;
 }
 
 /* Shown instead of C's terminal when there's no server to attach a PTY to. */
@@ -661,9 +662,11 @@ body {
 /* --- Pong ------------------------------------------------------------------ */
 
 .pong {
-  position: absolute;
+  /* fixed + high z so lounge HUD/jukebox (z-index 5 on .house) can't sit
+     above the game and steal clicks / start a room transition underneath. */
+  position: fixed;
   inset: 0;
-  z-index: 14;
+  z-index: 30;
   display: grid;
   place-items: center;
   background: rgba(6, 8, 12, 0.82);

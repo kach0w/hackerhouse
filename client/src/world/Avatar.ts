@@ -9,7 +9,7 @@
  * stays legible instead of turning into a blurry 3x-upscaled smear.
  */
 
-import { Container, Sprite, Text, TextStyle } from 'pixi.js';
+import { Container, Graphics, Sprite, Text, TextStyle } from 'pixi.js';
 
 import { CHAR_H, CHAR_W, characterSheet, type Dir } from '../art/character';
 import { shadowSprite } from '../art/props';
@@ -28,6 +28,7 @@ export class Avatar extends Container {
   private body = new Sprite();
   private shadow: Sprite;
   private nameLabel: Text;
+  private sitMask: Graphics | null = null;
 
   private sheet = characterSheet('');
   private facing: Dir = 'down';
@@ -94,6 +95,23 @@ export class Avatar extends Container {
     // Sitting drops the sprite a few pixels so it reads as being on the couch.
     this.body.y = a === 'sit' ? 4 : 0;
     this.shadow.visible = a !== 'sit';
+
+    if (a === 'sit') {
+      // Flat backdrop can't occlude the lower body the way a real chair back
+      // would — mask below shoulders so seated characters read as in the chair.
+      if (!this.sitMask) {
+        this.sitMask = new Graphics();
+        this.addChild(this.sitMask);
+      }
+      const top = this.body.y - CHAR_H;
+      const visibleH = CHAR_H * 0.55;
+      this.sitMask.clear();
+      this.sitMask.rect(-CHAR_W, top, CHAR_W * 2, visibleH);
+      this.sitMask.fill(0xffffff);
+      this.body.mask = this.sitMask;
+    } else {
+      this.body.mask = null;
+    }
   }
 
   setName(name: string) {

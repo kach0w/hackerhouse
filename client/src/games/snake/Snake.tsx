@@ -39,6 +39,7 @@ interface Props {
 
 export function Snake({ playerName, onClose }: Props) {
   const hostRef = useRef<HTMLDivElement>(null);
+  const rootRef = useRef<HTMLDivElement>(null);
   const stageRef = useRef<SnakeStage | null>(null);
   const stateRef = useRef<SnakeState>(createState(Date.now() >>> 0));
   const rafRef = useRef(0);
@@ -56,6 +57,10 @@ export function Snake({ playerName, onClose }: Props) {
     setHud(hudRef.current);
     startedRef.current = true;
     setStarted(true);
+  }, []);
+
+  useEffect(() => {
+    rootRef.current?.focus();
   }, []);
 
   useEffect(() => {
@@ -77,6 +82,7 @@ export function Snake({ playerName, onClose }: Props) {
 
         let last = performance.now();
         const loop = (t: number) => {
+          if (disposed) return;
           const dt = Math.min(0.05, (t - last) / 1000);
           last = t;
 
@@ -99,7 +105,18 @@ export function Snake({ playerName, onClose }: Props) {
     return () => {
       disposed = true;
       cancelAnimationFrame(rafRef.current);
-      stageRef.current?.destroy();
+      try {
+        stageRef.current?.destroy();
+      } catch {
+        /* ignore */
+      }
+      if (stageRef.current !== stage) {
+        try {
+          stage.destroy();
+        } catch {
+          /* ignore */
+        }
+      }
       stageRef.current = null;
     };
   }, []);
@@ -132,7 +149,7 @@ export function Snake({ playerName, onClose }: Props) {
   }, [onClose, restart]);
 
   return (
-    <div className="pong">
+    <div className="pong" ref={rootRef} tabIndex={-1} role="dialog" aria-label="Snake">
       <div className="pong-frame pong-frame--arcade">
         <div className="pong-hud">
           <span className="pong-name is-me">{playerName}</span>

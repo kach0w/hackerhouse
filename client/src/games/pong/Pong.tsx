@@ -24,11 +24,16 @@ interface Props {
 
 export function Pong({ names, role, transport, onClose }: Props) {
   const hostRef = useRef<HTMLDivElement>(null);
+  const rootRef = useRef<HTMLDivElement>(null);
   const stageRef = useRef<PongStage | null>(null);
   const matchRef = useRef<PongMatch | null>(null);
   const [state, setState] = useState<PongState | null>(null);
 
   const practice = !transport;
+
+  useEffect(() => {
+    rootRef.current?.focus();
+  }, []);
 
   useEffect(() => {
     const host = hostRef.current;
@@ -43,6 +48,7 @@ export function Pong({ names, role, transport, onClose }: Props) {
       transport: link,
       bot: practice,
       onState: (s) => {
+        if (disposed) return;
         stageRef.current?.render(s);
         setState({ ...s, score: { ...s.score }, paddle: { ...s.paddle } });
       },
@@ -65,7 +71,18 @@ export function Pong({ names, role, transport, onClose }: Props) {
       disposed = true;
       match.stop();
       if (!transport) link.close();
-      stageRef.current?.destroy();
+      try {
+        stageRef.current?.destroy();
+      } catch {
+        /* pixi may already be torn down */
+      }
+      if (stageRef.current !== stage) {
+        try {
+          stage.destroy();
+        } catch {
+          /* ignore */
+        }
+      }
       stageRef.current = null;
       matchRef.current = null;
     };
@@ -107,7 +124,7 @@ export function Pong({ names, role, transport, onClose }: Props) {
   const winner = state?.winner ?? null;
 
   return (
-    <div className="pong">
+    <div className="pong" ref={rootRef} tabIndex={-1} role="dialog" aria-label="Pong">
       <div className="pong-frame">
         <div className="pong-hud">
           <span className={`pong-name${mySide === 'left' ? ' is-me' : ''}`}>{names.left}</span>

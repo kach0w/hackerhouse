@@ -72,69 +72,49 @@ export function facingFromDelta(dx: number, dy: number): 'up' | 'down' | 'left' 
 // --- Room scene geometry -----------------------------------------------------
 
 /**
- * The room fills the whole viewport: your avatar sits at a desk with a large
- * monitor, and the real terminal is positioned exactly over that monitor's
- * glass — so the agent runs on the machine your character is using, rather
- * than in a panel bolted above the scene.
+ * The room is a single illustrated background image now (see
+ * RoomStage.drawBackdrop) — walls, desk, monitor, bed, bookshelf, everything
+ * lives in the art file. It's stretched to fill this footprint and shown in
+ * full (contain-fit, letterboxed if the viewport's aspect ratio doesn't
+ * match), not cropped/zoomed the way the old tile-drawn room was — the whole
+ * thing is a composed illustration meant to be seen as a whole.
  *
- * It's a large tilemap the camera sits *inside*, not a fixed picture scaled to
- * fit. Letterboxing a fixed room meant a tall window showed a small rectangle
- * floating in black; this way floor and walls run to every edge at a clean
- * integer zoom.
+ * Source art is 1280x832; this is scaled down 0.8x to keep native-pixel
+ * coordinates in a similar range to the rest of the app.
  */
 export const ROOM_PX_W = 1024;
 export const ROOM_PX_H = 640;
 
-/** Everything above this line is wall, everything below is floor. */
-export const ROOM_FLOOR_TOP = 256;
-export const ROOM_WALL_ROWS = ROOM_FLOOR_TOP / TILE;
+/**
+ * Monitor glass, in the same ROOM_PX_W x ROOM_PX_H space — the terminal is
+ * overlaid here in CSS pixels. Measured from the art: dark terminal area plus
+ * the blue profile-icon panel, versus warm wood/bezel around them. Source
+ * edges ≈ x=399–880, y=124–393 (of 1280x832), scaled by 0.8 / 0.7692. The
+ * right edge was nudged out so the DOM frame sits flush with the TV glass
+ * instead of leaving a sliver of illustrated screen beside it.
+ */
+export const MONITOR_SCREEN = { x: 319, y: 95, w: 386, h: 207 };
 
-/** The desk composition is centred on this column. */
-export const ROOM_CX = 512;
+/** Where the room owner sits — in the chair, facing the monitor. */
+export const DESK = { x: 508, y: 445 };
+
+/** Where an arriving avatar starts, roughly at the door in the art. */
+export const ROOM_DOOR = { x: 64, y: 462 };
 
 /**
- * Camera target: the midpoint of the composition (monitor top ~87 down to the
- * chair ~352), so the whole desk setup stays framed rather than clipping the
- * top of the bezel.
+ * Where visiting avatars stand — well clear to the left of the owner's
+ * chair, not crowding the desk.
  */
-export const ROOM_FOCUS = { x: ROOM_CX, y: 220 };
-
-/**
- * The area the camera guarantees is visible — and therefore what sets the zoom.
- *
- * ⚠️ These are load-bearing, not slack. Zoom is `floor(min(w/VIEW_W, h/VIEW_H))`,
- * so nudging either value up can cross an integer threshold and drop the zoom a
- * whole step, which makes everything *smaller* on screen even as it grows in
- * native pixels. That already happened once: VIEW_H 300 → 320 took a 1440x900
- * window from 3x to 2x and shrank the monitor from 564px to 470px of glass.
- *
- * Keep these just above the composition's real extent (≈340 x ≈265) and change
- * them only while watching the resulting glass width.
- */
-export const ROOM_VIEW_W = 360;
-export const ROOM_VIEW_H = 275;
-
-/** Monitor bezel footprint, native px. */
-export const MONITOR = { x: ROOM_CX - 130, y: 87, w: 260, h: 165 };
-
-/**
- * The glass — the terminal is overlaid here in CSS pixels. Keep this in sync
- * with `monitorFrame()` in art/props.ts: the sprite draws the bezel around this
- * rect and leaves the interior empty so the DOM terminal shows through.
- */
-export const MONITOR_SCREEN = { x: ROOM_CX - 117, y: 100, w: 235, h: 130 };
-
-/** Desk slab under the monitor. */
-export const DESK_TOP = { x: ROOM_CX - 150, y: 252, w: 300, h: 34 };
-
-/** Where the room owner sits — in front of the desk, back to the viewer. */
-export const DESK = { x: ROOM_CX, y: 332 };
-export const ROOM_DOOR = { x: ROOM_CX - 212, y: 300 };
-
-/** Where visiting avatars stand once they've walked in — right by the chair. */
 export const VISITOR_SLOTS = [
-  { x: ROOM_CX + 68, y: 328 },
-  { x: ROOM_CX + 92, y: 344 },
-  { x: ROOM_CX - 68, y: 328 },
-  { x: ROOM_CX - 92, y: 344 },
+  { x: 130, y: 505 },
+  { x: 850, y: 505 },
+  { x: 170, y: 475 },
+  { x: 810, y: 475 },
 ];
+
+/**
+ * The character sprite's native 20x30 size was tuned for the old tile-drawn
+ * room. Against this illustration's larger furniture, scale avatars up in the
+ * Room only so a seated character looks proportionate to the chair.
+ */
+export const ROOM_AVATAR_SCALE = 4;

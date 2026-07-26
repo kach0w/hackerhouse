@@ -120,6 +120,21 @@ function House() {
     enterRoom(selfId);
   }, [bootView, self, selfId, enterRoom]);
 
+  // `view` always starts at 'lounge' — but if a reconnect restores presence
+  // with state === 'room', rendering the lounge anyway leaves you invisible
+  // there AND permanently deadlocks the next transition (scriptedWalk waits
+  // on an avatar that was never added). Snap straight to the correct view.
+  const syncedInitialView = useRef(false);
+  useEffect(() => {
+    if (bootView || syncedInitialView.current || !self) return;
+    syncedInitialView.current = true;
+    if (self.state === 'room' && self.roomId) {
+      setActiveRoomId(self.roomId);
+      setView('room');
+      setTerminalVisible(true);
+    }
+  }, [bootView, self]);
+
   // Visitors don't own the room they're standing in — if the owner heads back
   // to the lounge, staying behind means watching an empty desk. Follow them
   // out automatically. `goToLounge` is a no-op while another transition is

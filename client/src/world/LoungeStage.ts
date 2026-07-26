@@ -105,6 +105,7 @@ export class LoungeStage {
   private ambient: AmbientController | null = null;
   private ambientPaused = false;
   private script: { x: number; y: number; resolve: () => void } | null = null;
+  private scriptTimer: ReturnType<typeof setTimeout> | null = null;
   private users: User[] = [];
 
   private cam = { x: 240, y: 200 };
@@ -147,6 +148,7 @@ export class LoungeStage {
 
   destroy() {
     this.ro?.disconnect();
+    this.clearScriptTimer();
     this.script?.resolve();
     this.app.destroy(true, { children: true });
   }
@@ -164,14 +166,35 @@ export class LoungeStage {
   scriptedWalk(x: number, y: number): Promise<void> {
     this.setAmbientPaused(true);
     this.script?.resolve();
+    this.clearScriptTimer();
     return new Promise<void>((resolve) => {
       this.script = { x, y, resolve };
+      this.scriptTimer = setTimeout(() => {
+        if (!this.script) return;
+        this.selfPos = { x: this.script.x, y: this.script.y };
+        const done = this.script.resolve;
+        this.script = null;
+        this.scriptTimer = null;
+        const av = this.avatars.get(this.selfId);
+        av?.setWalking(false);
+        av?.setActivity(null);
+        av?.position.set(this.selfPos.x, this.selfPos.y);
+        done();
+      }, 8000);
     });
   }
 
   cancelScript() {
+    this.clearScriptTimer();
     this.script?.resolve();
     this.script = null;
+  }
+
+  private clearScriptTimer() {
+    if (this.scriptTimer) {
+      clearTimeout(this.scriptTimer);
+      this.scriptTimer = null;
+    }
   }
 
   setSelfPosition(x: number, y: number) {
@@ -245,6 +268,7 @@ export class LoungeStage {
         this.selfPos = { x, y };
         const done = this.script.resolve;
         this.script = null;
+        this.clearScriptTimer();
         av.setWalking(false);
         done();
       } else {
