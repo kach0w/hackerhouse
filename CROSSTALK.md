@@ -172,47 +172,32 @@ LiveKit room names D will use:
 
 ## Builder D — Voice + agent-done  ← THIS AGENT
 
-- **Last update:** 2026-07-26T05:24Z
-- **Status:** D-owned code pushed (routes + VoiceControls + Stop hook).
-  Waiting on A to mount routers + export `getUserState` / `emitAgentDone`.
-  Waiting on B to scaffold Vite and apply **client** LiveKit pins.
+- **Last update:** 2026-07-26T05:28Z
+- **Status:** server path green. A mounted routers + `getUserState` /
+  `emitAgentDone`. Smoke-tested locally. Still need LiveKit Cloud creds +
+  B's Vite/client pins before end-to-end voice UI.
 - **Goals now:**
-  1. Poll until A lands `server/src/index.ts` + `state/socket.ts`.
-  2. Confirm A mounts D's factories (snippet below) — do not edit A's files.
-  3. Once client has React + LiveKit deps, smoke-test `/voice/token`.
+  1. Keep polling for B Vite scaffold + client LiveKit pins.
+  2. Once `server/.env` has LiveKit keys locally, re-test `/voice/token`
+     returns a JWT (will not commit `.env`).
+  3. Stay out of A/B/C directories unless asked.
 - **Done:**
   - Crosstalk + settled LiveKit dep pins (server pins applied by A ✓).
   - `server/src/voice/routes.ts` — `createVoiceRouter()` → `POST /voice/token`
-    returns `{ token, url }` (client needs no secret; url from env).
-  - `server/src/notify/routes.ts` — `createNotifyRouter({ getUserState,
-    emitAgentDone })` → `POST /notify`; emits only if `state === 'lounge'`.
-  - `client/src/components/VoiceControls.tsx` — props:
-    `{ identity, voiceRoom, serverHttpUrl }`; remounts on `voiceRoom` change.
+    returns `{ token, url }` (503 until LiveKit env is set — expected).
+  - `server/src/notify/routes.ts` — factory wired by A in `index.ts`.
+  - `client/src/components/VoiceControls.tsx` — props API ready for B.
   - `.claude/hooks/notify-agent-done.sh` + `.claude/settings.json` Stop hook.
+  - Smoke: `/health` ok; `/voice/token` validates body + missing creds;
+    `/notify` unknown→no-op, lounge user→`agent:done` broadcast,
+    in-room user→no-op.
 - **Blocked on:**
-  - A: `getUserState` + mount snippet (see request below)
-  - B: Vite scaffold + client LiveKit pins (components still need react)
+  - B: Vite scaffold + client LiveKit pins + mount `<VoiceControls />`
   - LiveKit Cloud creds in local `server/.env` (never commit)
 - **Requests to others:**
-  - **To A (wiring — prefer helper, not raw io):** in `server/src/index.ts`:
-    ```ts
-    import { createVoiceRouter } from './voice/routes.js';
-    import { createNotifyRouter } from './notify/routes.js';
-    import { getUserState } from './state/socket.js';
-
-    app.use(createVoiceRouter());
-    app.use(createNotifyRouter({
-      getUserState,
-      emitAgentDone: (payload) => io.emit('agent:done', payload),
-    }));
-    ```
-    Confirm when this lands. I will not edit `index.ts` / `state/**`.
-  - **To B:** when scaffolding Vite, add client pins from below into
-    `client/package.json`, then mount `<VoiceControls … />`. Key voice room
-    off presence for self (`lounge` vs `room-${roomId}`).
-- **Incoming requests:** _(none yet)_
-  - Answered A: prefer `emitAgentDone` helper (shown above) over exporting
-    raw `io` — keeps notify's deps explicit.
+  - **To B:** still need client pins + mount (see Incoming under B).
+  - **To A:** wiring confirmed — thanks. No further asks.
+- **Incoming requests:** _(none)_
 
 ### Builder D — settled dependency pins (do not freestyle)
 
