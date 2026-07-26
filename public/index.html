@@ -60,6 +60,24 @@
     .furniture.plant { background: #2f5c2f; border-radius: 50%; }
     .avatar { z-index: 2; }
 
+    /* --- corgi pets --- */
+    .corgi {
+      position: absolute; width: 26px; height: 19px; pointer-events: none; z-index: 3;
+      image-rendering: pixelated; image-rendering: crisp-edges;
+    }
+
+    /* --- room floor strip the follower corgi patrols --- */
+    #roomView { position: relative; }
+    #roomFloor {
+      position: relative; height: 72px;
+      background-color: #241b12;
+      background-image:
+        linear-gradient(#3a2c1c 1px, transparent 1px),
+        linear-gradient(90deg, #3a2c1c 1px, transparent 1px);
+      background-size: 32px 32px;
+      border-top: 2px solid #4a3a26;
+    }
+
     /* --- fade overlay for transitions --- */
     #fade {
       position: fixed; inset: 0; background: #000; opacity: 0;
@@ -103,6 +121,7 @@
     </div>
     <div id="links"></div>
     <div id="terminal"></div>
+    <div id="roomFloor"></div>
   </div>
 
   <script src="https://cdn.jsdelivr.net/npm/xterm@5.3.0/lib/xterm.js"></script>
@@ -118,6 +137,8 @@
       setTimeout(() => {
         loungeView.classList.toggle("active", showLounge);
         roomView.classList.toggle("active", !showLounge);
+        if (showLounge) sendCorgiToLounge();
+        else sendCorgiToRoom();
         if (!showLounge) setTimeout(() => safeFit(), 50);
         setTimeout(() => fade.classList.remove("active"), 50);
       }, 400);
@@ -235,6 +256,265 @@
       history.replaceState(null, "", location.pathname);
       switchView(true);
     };
+
+    // ---------- corgi pets: 4 pixel corgis wander the lounge, one follows ----------
+    // ---------- you into the room and patrols the floor strip there ----------
+    const CORGI_W = 26, CORGI_H = 19;
+    const CORGI_NATIVE_W = 22, CORGI_NATIVE_H = 16;
+
+    function drawCorgi(ctx, walkPhase, facingRight) {
+      const tan = "#dd9c53", earTan = "#b97a37", cream = "#f7ecd9", black = "#2a1c12";
+      ctx.clearRect(0, 0, CORGI_NATIVE_W, CORGI_NATIVE_H);
+      ctx.save();
+      if (!facingRight) {
+        ctx.translate(CORGI_NATIVE_W, 0);
+        ctx.scale(-1, 1);
+      }
+      const px = (x, y, w, h, color) => {
+        ctx.fillStyle = color;
+        ctx.fillRect(x, y, w, h);
+      };
+
+      px(0, 6, 2, 2, tan); // tail
+      px(0, 6, 1, 1, cream); // tail tip
+      px(2, 6, 13, 5, tan); // body
+      px(4, 10, 9, 1, cream); // belly
+      px(14, 2, 8, 7, tan); // head
+      px(14, 0, 3, 2, earTan); // back ear
+      px(19, 0, 3, 2, earTan); // front ear
+      px(19, 6, 3, 3, cream); // muzzle
+      px(21, 6, 1, 2, black); // nose
+      px(17, 4, 1, 1, black); // eye
+
+      // legs, alternating extension for a simple 2-frame walk cycle
+      const legLen = 4;
+      [[3, 0], [7, 1]].forEach(([x, i]) => {
+        const extend = walkPhase === 0 ? (i === 0 ? 1 : 0) : (i === 0 ? 0 : 1);
+        px(x, 11, 2, legLen + extend, tan);
+        px(x, 11 + legLen + extend - 1, 2, 1, black);
+      });
+      [[12, 0], [16, 1]].forEach(([x, i]) => {
+        const extend = walkPhase === 0 ? (i === 0 ? 0 : 1) : (i === 0 ? 1 : 0);
+        px(x, 9, 2, legLen + extend, tan);
+        px(x, 9 + legLen + extend - 1, 2, 1, black);
+      });
+
+      ctx.restore();
+    }
+
+    function corgiBlocked(x, y, bounds, obstacles) {
+      const r = { x, y, w: CORGI_W, h: CORGI_H };
+      if (x < bounds.x || y < bounds.y || x + r.w > bounds.x + bounds.w || y + r.h > bounds.y + bounds.h) {
+        return true;
+      }
+      return obstacles.some((o) => rectsOverlap(r, o));
+    }
+
+    function positionCorgi(c) {
+      c.canvas.style.left = c.x + "px";
+      c.canvas.style.top = c.y + "px";
+    }
+
+    function redrawCorgi(c) {
+      const key = c.facingRight + ":" + c.walkPhase;
+      if (key === c.drawKey) return;
+      c.drawKey = key;
+      drawCorgi(c.ctx, c.walkPhase, c.facingRight);
+    }
+
+    function makeCorgi(container, x, y) {
+      const canvas = document.createElement("canvas");
+      canvas.width = CORGI_NATIVE_W;
+      canvas.height = CORGI_NATIVE_H;
+      canvas.className = "corgi";
+      container.appendChild(canvas);
+      const ctx = canvas.getContext("2d");
+      ctx.imageSmoothingEnabled = false;
+      const c = {
+        canvas, ctx, x, y, targetX: x, targetY: y,
+        speed: 26 + Math.random() * 18,
+        facingRight: true, walkPhase: 0, walkTimer: 0,
+        idle: true, idleTimer: 0.3 + Math.random(),
+        drawKey: "",
+      };
+      redrawCorgi(c);
+      positionCorgi(c);
+      return c;
+    }
+
+    function pickCorgiTarget(c, bounds, obstacles) {
+      for (let i = 0; i < 20; i++) {
+        const x = bounds.x + Math.random() * Math.max(1, bounds.w - CORGI_W);
+        const y = bounds.y + Math.random() * Math.max(1, bounds.h - CORGI_H);
+        if (!corgiBlocked(x, y, bounds, obstacles)) {
+          c.targetX = x;
+          c.targetY = y;
+          return;
+        }
+      }
+      c.targetX = c.x;
+      c.targetY = c.y;
+    }
+
+    function updateCorgi(c, dt, bounds, obstacles) {
+      if (c.idle) {
+        c.idleTimer -= dt;
+        if (c.idleTimer <= 0) {
+          c.idle = false;
+          pickCorgiTarget(c, bounds, obstacles);
+        }
+        return;
+      }
+      const dx = c.targetX - c.x, dy = c.targetY - c.y;
+      const dist = Math.hypot(dx, dy);
+      if (dist < 2) {
+        c.idle = true;
+        c.idleTimer = 0.8 + Math.random() * 2.2;
+        return;
+      }
+      const dirX = dx / dist, dirY = dy / dist;
+      const stepX = dirX * c.speed * dt;
+      const stepY = dirY * c.speed * dt;
+      if (Math.abs(dx) > 1) c.facingRight = dx > 0;
+
+      // AABB slide: try the full step, then each axis alone, then a deflection
+      // perpendicular to the direction of travel, so the corgi routes around
+      // an obstacle's edge instead of phasing through it. Greedily re-aiming
+      // at the target every frame can still make it hug a corner and barely
+      // creep (or, at an exact tangent, not move at all) — the stuckTime
+      // check below is the real guarantee against ever freezing in place.
+      const startX = c.x, startY = c.y;
+      if (!corgiBlocked(c.x + stepX, c.y + stepY, bounds, obstacles)) {
+        c.x += stepX;
+        c.y += stepY;
+      } else if (!corgiBlocked(c.x + stepX, c.y, bounds, obstacles)) {
+        c.x += stepX;
+      } else if (!corgiBlocked(c.x, c.y + stepY, bounds, obstacles)) {
+        c.y += stepY;
+      } else {
+        const perpX = -dirY * c.speed * dt;
+        const perpY = dirX * c.speed * dt;
+        if (!corgiBlocked(c.x + perpX, c.y + perpY, bounds, obstacles)) {
+          c.x += perpX;
+          c.y += perpY;
+        } else if (!corgiBlocked(c.x - perpX, c.y - perpY, bounds, obstacles)) {
+          c.x -= perpX;
+          c.y -= perpY;
+        }
+      }
+
+      const progressed = Math.hypot(c.x - startX, c.y - startY) > 0.05;
+      c.stuckTime = progressed ? 0 : (c.stuckTime || 0) + dt;
+      if (c.stuckTime > 0.4) {
+        c.stuckTime = 0;
+        pickCorgiTarget(c, bounds, obstacles);
+        return;
+      }
+
+      c.walkTimer += dt;
+      if (c.walkTimer > 0.16) {
+        c.walkTimer = 0;
+        c.walkPhase = c.walkPhase ? 0 : 1;
+      }
+      redrawCorgi(c);
+      positionCorgi(c);
+    }
+
+    function rectOf(el) {
+      return { x: el.offsetLeft, y: el.offsetTop, w: el.offsetWidth, h: el.offsetHeight };
+    }
+
+    function loungeBounds() {
+      const bar = loungeView.querySelector("#bar");
+      const top = bar.offsetHeight + 6;
+      return { x: 6, y: top, w: loungeView.clientWidth - 12, h: loungeView.clientHeight - top - 6 };
+    }
+
+    function loungeObstacles(forCorgi) {
+      const els = [
+        document.getElementById("doorToRoom"),
+        document.getElementById("meAvatar"),
+        document.getElementById("other1"),
+        document.getElementById("other2"),
+      ];
+      const rects = els.filter(Boolean).map(rectOf).concat(getObstacles());
+      corgis.forEach((c) => {
+        if (c !== forCorgi && c.canvas.parentElement === loungeView) {
+          rects.push({ x: c.x, y: c.y, w: CORGI_W, h: CORGI_H });
+        }
+      });
+      return rects;
+    }
+
+    function roomBounds() {
+      return rectOf(document.getElementById("roomFloor"));
+    }
+
+    function roomObstacles() {
+      return [rectOf(document.getElementById("terminal"))];
+    }
+
+    const corgis = [
+      makeCorgi(loungeView, 70, 470),
+      makeCorgi(loungeView, 900, 130),
+      makeCorgi(loungeView, 1040, 540),
+      makeCorgi(loungeView, 240, 610),
+    ];
+    const followerCorgi = corgis[0];
+
+    function sendCorgiToRoom() {
+      if (followerCorgi.canvas.parentElement !== roomView) {
+        roomView.appendChild(followerCorgi.canvas);
+      }
+      followerCorgi.idle = true;
+      followerCorgi.idleTimer = 10; // hold still until the room floor's layout below settles
+      // #roomFloor's position depends on the terminal's fitAddon resize, which
+      // runs in its own delayed callback — wait for that before reading bounds,
+      // or we'd spawn the corgi at a stale (usually way too high) position.
+      followerCorgi.canvas.style.visibility = "hidden";
+      setTimeout(() => {
+        const bounds = roomBounds();
+        followerCorgi.x = bounds.x + bounds.w / 2 - CORGI_W / 2;
+        followerCorgi.y = bounds.y + (bounds.h - CORGI_H) / 2;
+        positionCorgi(followerCorgi);
+        followerCorgi.canvas.style.visibility = "visible";
+        followerCorgi.idleTimer = 0.3;
+      }, 80);
+    }
+
+    function sendCorgiToLounge() {
+      if (followerCorgi.canvas.parentElement !== loungeView) {
+        loungeView.appendChild(followerCorgi.canvas);
+      }
+      const door = document.getElementById("doorToRoom");
+      followerCorgi.x = Math.max(6, door.offsetLeft - CORGI_W - 8);
+      followerCorgi.y = door.offsetTop + 10;
+      followerCorgi.idle = true;
+      followerCorgi.idleTimer = 0.3;
+      positionCorgi(followerCorgi);
+    }
+
+    let corgiLastTs = null;
+    function corgiLoop(ts) {
+      if (corgiLastTs == null) corgiLastTs = ts;
+      const dt = Math.min(0.05, (ts - corgiLastTs) / 1000);
+      corgiLastTs = ts;
+
+      if (loungeView.classList.contains("active")) {
+        const bounds = loungeBounds();
+        corgis.forEach((c) => {
+          if (c.canvas.parentElement === loungeView) updateCorgi(c, dt, bounds, loungeObstacles(c));
+        });
+      } else if (roomView.classList.contains("active")) {
+        const bounds = roomBounds();
+        const obstacles = roomObstacles();
+        corgis.forEach((c) => {
+          if (c.canvas.parentElement === roomView) updateCorgi(c, dt, bounds, obstacles);
+        });
+      }
+      requestAnimationFrame(corgiLoop);
+    }
+    requestAnimationFrame(corgiLoop);
 
     // ---------- terminal + room logic ----------
     const status = document.getElementById("roomStatus");
