@@ -67,7 +67,7 @@ function MuteToggle() {
 function PeerCount() {
   const participants = useParticipants();
   // includes local
-  return <span>{participants.length} in voice</span>;
+  return <span className="voice-peer-count">{participants.length} in voice</span>;
 }
 
 function VoiceSession({
