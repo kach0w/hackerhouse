@@ -155,10 +155,12 @@ export const ROOM_PX_H = 640;
  * art file pixel-by-pixel for the dark terminal-background rectangle plus
  * the lighter blue profile-icon panel beside it (both part of the same
  * screen glass, not separate decor) versus the warm wood/bezel tones around
- * them. Edges at source x=399-870, y=124-393 (of 1280x832), scaled by
- * 0.8/0.7692. Re-measure the same way if the art file ever changes.
+ * them. True glass edges land at source x=403-876, y=130-388 (of 1280x832,
+ * scaled by 0.8/0.7692) — this rect is inset a few px inside that on every
+ * edge so the canvas blackout never bleeds onto the bezel. Re-measure the
+ * same way if the art file ever changes.
  */
-export const MONITOR_SCREEN = { x: 319, y: 95, w: 377, h: 207 };
+export const MONITOR_SCREEN = { x: 325, y: 103, w: 365, h: 191 };
 
 /** Where the room owner sits — in the chair, facing the monitor. */
 export const DESK = { x: 508, y: 445 };
