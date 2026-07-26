@@ -132,6 +132,7 @@ export class RoomStage {
     for (const u of occupants) {
       seen.add(u.userId);
       let av = this.avatars.get(u.userId);
+      const isSelf = u.userId === selfId;
       if (!av) {
         // Added to sortLayer, which sits on top of the whole backdrop image
         // — a new arrival just appears standing in the scene, not baked in.
@@ -139,16 +140,26 @@ export class RoomStage {
         av.scale.set(ROOM_AVATAR_SCALE);
         this.avatars.set(u.userId, av);
         this.sortLayer.addChild(av);
-        av.position.set(ROOM_DOOR.x, ROOM_DOOR.y);
+        // The self-avatar's spawn point is whatever the transition already
+        // staged via setSelfPosition (defaults to the door) — never the
+        // door constant directly, or a scripted walk that started before
+        // this first sync would have nothing to animate from.
+        const spawn = isSelf ? this.selfPos : ROOM_DOOR;
+        av.position.set(spawn.x, spawn.y);
       }
       av.setName(u.name);
       av.zIndex = Z.occupant;
 
       if (u.userId === ownerId) {
-        av.position.set(DESK.x, DESK.y);
-        av.setFacing('up'); // back to the viewer, looking at the monitor
-        av.setActivity('sit');
-      } else if (u.userId !== selfId) {
+        // Never snap the self-avatar's position here — it's owned by
+        // `this.selfPos`/tick() (scripted walk or arrival), so an occupant
+        // update mid-walk can't teleport you out from under your own walk.
+        if (!isSelf) av.position.set(DESK.x, DESK.y);
+        if (!isSelf || !this.script) {
+          av.setFacing('up'); // back to the viewer, looking at the monitor
+          av.setActivity('sit');
+        }
+      } else if (!isSelf) {
         const slot = VISITOR_SLOTS[visitorIdx++ % VISITOR_SLOTS.length];
         av.position.set(slot.x, slot.y);
         av.setFacing(slot.x > DESK.x ? 'left' : 'right');
@@ -168,24 +179,29 @@ export class RoomStage {
   private tick(dt: number) {
     const me = this.avatars.get(this.selfId);
 
-    if (me && this.script) {
-      const { x, y } = this.script;
-      const dx = x - this.selfPos.x;
-      const dy = y - this.selfPos.y;
-      const d = Math.hypot(dx, dy);
+    if (me) {
+      if (this.script) {
+        const { x, y } = this.script;
+        const dx = x - this.selfPos.x;
+        const dy = y - this.selfPos.y;
+        const d = Math.hypot(dx, dy);
 
-      if (d < Math.max(ARRIVE_EPS, SCRIPT_WALK_SPEED * dt)) {
-        this.selfPos = { x, y };
-        const done = this.script.resolve;
-        this.script = null;
-        me.setWalking(false);
-        done();
-      } else {
-        const step = (SCRIPT_WALK_SPEED * dt) / d;
-        this.selfPos = { x: this.selfPos.x + dx * step, y: this.selfPos.y + dy * step };
-        me.setFacing(facingFromDelta(dx, dy));
-        me.setWalking(true);
+        if (d < Math.max(ARRIVE_EPS, SCRIPT_WALK_SPEED * dt)) {
+          this.selfPos = { x, y };
+          const done = this.script.resolve;
+          this.script = null;
+          me.setWalking(false);
+          done();
+        } else {
+          const step = (SCRIPT_WALK_SPEED * dt) / d;
+          this.selfPos = { x: this.selfPos.x + dx * step, y: this.selfPos.y + dy * step };
+          me.setFacing(facingFromDelta(dx, dy));
+          me.setWalking(true);
+        }
       }
+      // Applied every frame, script or not, so the self-avatar's on-screen
+      // position always matches `selfPos` — the single source of truth —
+      // instead of whatever `syncOccupants` last snapped it to.
       me.position.set(this.selfPos.x, this.selfPos.y);
     }
 

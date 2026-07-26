@@ -115,7 +115,10 @@ export class LoungeStage {
   private pets: Pet[] = [];
 
   private selfId = '';
-  private selfPos = { x: 240, y: 200 };
+  // Defaults to the stairs, not an arbitrary floor coordinate: that's the
+  // door back from a room, and the only spot a freshly-created stage can be
+  // sure is correct before `setSelfPosition` has had a chance to run.
+  private selfPos = { ...STAIRS };
   private ambient: AmbientController | null = null;
   private ambientPaused = false;
   private script: { x: number; y: number; resolve: () => void } | null = null;
@@ -213,8 +216,16 @@ export class LoungeStage {
         av = new Avatar(u.userId, u.name);
         this.avatars.set(u.userId, av);
         this.sortLayer.addChild(av);
-        av.position.set(u.x, u.y);
-        this.targets.set(u.userId, { x: u.x, y: u.y, facing: u.facing, still: 0 });
+
+        if (u.userId === this.selfId) {
+          // Spawn at whatever the transition already staged via
+          // setSelfPosition (defaults to the stairs) — never the server's
+          // possibly-stale `u.x/u.y`, which is only meaningful for peers.
+          av.position.set(this.selfPos.x, this.selfPos.y);
+        } else {
+          av.position.set(u.x, u.y);
+          this.targets.set(u.userId, { x: u.x, y: u.y, facing: u.facing, still: 0 });
+        }
       }
       av.setName(u.name);
 
