@@ -66,8 +66,50 @@ function cleanEnv(base) {
   return env;
 }
 
+// Mirrors pty.ts's ensureNotifyHook, using the copy of the hook script
+// install.sh fetched from this same server (there's no repo checkout on
+// this machine to read it from) — without this, a standalone-agent-backed
+// room's claude session would never fire agent:done in the lounge.
+function ensureNotifyHook(cwd) {
+  const hookSrc = path.join(AGENT_DIR, 'notify-agent-done.sh');
+  if (!fs.existsSync(hookSrc)) {
+    console.warn(`[agent] notify hook missing at ${hookSrc} — agent-done will not fire`);
+    return;
+  }
+  try {
+    const hooksDir = path.join(cwd, '.claude', 'hooks');
+    fs.mkdirSync(hooksDir, { recursive: true });
+
+    const hookDest = path.join(hooksDir, 'notify-agent-done.sh');
+    fs.copyFileSync(hookSrc, hookDest);
+    fs.chmodSync(hookDest, 0o755);
+
+    const settingsPath = path.join(cwd, '.claude', 'settings.json');
+    let settings = {};
+    if (fs.existsSync(settingsPath)) {
+      try {
+        settings = JSON.parse(fs.readFileSync(settingsPath, 'utf8'));
+      } catch {
+        settings = {};
+      }
+    }
+
+    const escaped = hookDest.replace(/'/g, `'\\''`);
+    const prevHooks = settings.hooks && typeof settings.hooks === 'object' ? settings.hooks : {};
+    settings.hooks = {
+      ...prevHooks,
+      Stop: [{ hooks: [{ type: 'command', command: `bash '${escaped}'` }] }],
+    };
+
+    fs.writeFileSync(settingsPath, `${JSON.stringify(settings, null, 2)}\n`);
+  } catch (err) {
+    console.warn('[agent] failed to install notify Stop hook:', err.message);
+  }
+}
+
 function spawnClaudeOrFallback(roomId) {
   const cwd = resolveCwd(roomId);
+  ensureNotifyHook(cwd);
   console.log(`[agent] room ${roomId} -> cwd ${cwd}`);
   const opts = {
     name: 'xterm-color',

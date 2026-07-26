@@ -9,7 +9,7 @@
 set -euo pipefail
 
 TOKEN="${1:?token required (copied from the app)}"
-ORIGIN="${2:?origin required (the app's URL)}"
+ORIGIN="${2:?origin required (the app URL)}"
 USER_ID="${3:?userId required (your own userId, same one the app uses)}"
 AGENT_DIR="$HOME/.hackerhouse-agent"
 
@@ -22,6 +22,9 @@ fi
 mkdir -p "$AGENT_DIR"
 curl -fsSL "$ORIGIN/agent/agent.js" -o "$AGENT_DIR/agent.js"
 curl -fsSL "$ORIGIN/agent/package.json" -o "$AGENT_DIR/package.json"
+# Same Stop hook a host-spawned pty installs — so this agent's claude
+# session fires agent:done in the lounge exactly like a host-spawned one.
+curl -fsSL "$ORIGIN/agent/notify-agent-done.sh" -o "$AGENT_DIR/notify-agent-done.sh"
 
 cat > "$AGENT_DIR/env.json" <<EOF
 {"serverUrl":"$ORIGIN","roomId":"$USER_ID","token":"$TOKEN"}
