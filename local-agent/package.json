@@ -1,0 +1,17 @@
+{
+  "name": "hackerhouse-local-agent",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Local companion that gives each visitor their own real terminal, on their own machine, with their own Claude Code login.",
+  "main": "agent.js",
+  "scripts": {
+    "postinstall": "chmod +x node_modules/node-pty/prebuilds/*/spawn-helper 2>/dev/null || true",
+    "start": "node agent.js"
+  },
+  "dependencies": {
+    "@xterm/addon-serialize": "^0.14.0",
+    "@xterm/headless": "^6.0.0",
+    "node-pty": "^1.1.0",
+    "ws": "^8.21.1"
+  }
+}
