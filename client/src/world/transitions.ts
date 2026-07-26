@@ -125,15 +125,17 @@ export class TransitionRunner {
     const d = this.deps;
 
     try {
-      // 1. Terminal retracts upward first — it's the thing you're leaving.
-      d.setPhase('terminal-out');
-      d.setTerminalVisible(false);
-      await sleep(TERMINAL_MS);
-
-      // 2. Stand up and walk out.
+      // 1. Stand up and walk out first — the monitor stays on the whole time
+      // you're still visibly standing in the room. It only turns off once
+      // you've actually reached the door and are about to leave.
       d.setPhase('walk-to-door');
       const room = d.getRoomStage();
       if (room) await room.scriptedWalk(ROOM_DOOR.x, ROOM_DOOR.y);
+
+      // 2. Now retract the terminal, right before the fade to black.
+      d.setPhase('terminal-out');
+      d.setTerminalVisible(false);
+      await sleep(TERMINAL_MS);
 
       // 3. Fade to black.
       d.setPhase('fade-out');

@@ -386,15 +386,35 @@ export function deskTable(): Px {
   return p;
 }
 
+/**
+ * Landscape, not portrait — a tall boxed rectangle with a full dark border
+ * reads as a door/wardrobe front from an oblique top-down view. A wide, low
+ * bed with a headboard post on one short edge and feet peeking out from
+ * under the frame is what actually sells "furniture resting on the floor."
+ */
 export function bed(): Px {
-  const p = new Px(44, 60);
-  p.rect(0, 0, 44, 56, WOOD.dark);
-  p.rect(2, 2, 40, 10, '#e8e4dc'); // pillow
-  p.rect(2, 2, 40, 2, '#ffffff');
-  p.rect(2, 12, 40, 42, '#4a6fa8'); // duvet
-  p.rect(2, 12, 40, 2, shade('#4a6fa8', 0.25));
-  p.dither(4, 16, 36, 34, shade('#4a6fa8', -0.12), 0);
-  p.rect(0, 54, 44, 4, shade(WOOD.dark, -0.3));
+  const p = new Px(96, 56);
+
+  // Headboard + footboard posts, not a full enclosing frame.
+  p.rect(0, 4, 9, 48, WOOD.dark);
+  p.rect(0, 4, 3, 48, shade(WOOD.dark, 0.18));
+  p.rect(87, 8, 9, 40, WOOD.dark);
+
+  // Duvet.
+  p.rect(9, 6, 78, 46, '#4a6fa8');
+  p.rect(9, 6, 78, 2, shade('#4a6fa8', 0.25));
+  p.dither(11, 24, 74, 26, shade('#4a6fa8', -0.12), 0);
+
+  // Pillow spans the bed's full width (top-to-bottom edge to edge), sitting
+  // near the headboard rather than stretched lengthwise down the mattress.
+  p.rect(9, 6, 26, 46, '#e8e4dc');
+  p.rect(9, 6, 26, 2, '#ffffff');
+  p.vline(22, 6, 46, shade('#e8e4dc', -0.15)); // seam, two pillows side by side
+
+  // Feet poking out below the frame — the "sitting on the floor" tell.
+  p.rect(3, 50, 4, 5, shade(WOOD.dark, -0.3));
+  p.rect(89, 42, 4, 5, shade(WOOD.dark, -0.3));
+
   p.outline(OUTLINE);
   return p;
 }

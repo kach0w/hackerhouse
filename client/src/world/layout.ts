@@ -131,10 +131,10 @@ export const DESK_TOP = { x: ROOM_CX - 150, y: 252, w: 300, h: 34 };
 export const DESK = { x: ROOM_CX, y: 332 };
 export const ROOM_DOOR = { x: ROOM_CX - 212, y: 300 };
 
-/** Where visiting avatars stand once they've walked in — off to the side. */
+/** Where visiting avatars stand once they've walked in — right by the chair. */
 export const VISITOR_SLOTS = [
-  { x: ROOM_CX + 132, y: 330 },
-  { x: ROOM_CX + 168, y: 350 },
-  { x: ROOM_CX - 132, y: 330 },
-  { x: ROOM_CX - 168, y: 350 },
+  { x: ROOM_CX + 68, y: 328 },
+  { x: ROOM_CX + 92, y: 344 },
+  { x: ROOM_CX - 68, y: 328 },
+  { x: ROOM_CX - 92, y: 344 },
 ];
