@@ -2,6 +2,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import pty, { type IPty } from 'node-pty';
+import { mintSessionToken } from '../state/socket.js';
 
 const BUFFER_CAP = 10_000;
 
@@ -130,8 +131,15 @@ export function spawnClaudeOrFallback(roomId: string, serverUrl?: string): IPty 
       ...cleanEnv(process.env),
       HACKERHOUSE_SERVER_URL: serverUrl ?? `http://localhost:${process.env.PORT ?? '3001'}`,
       HACKERHOUSE_USER_ID: roomId,
+      // /notify authenticates on this rather than a claimed userId.
+      HACKERHOUSE_SESSION_TOKEN: mintSessionToken(roomId),
     },
   };
+  // Tests set HACKERHOUSE_FORCE_SHELL so they can assert on shell echo instead
+  // of fighting Claude Code's TUI.
+  if (process.env.HACKERHOUSE_FORCE_SHELL) {
+    return pty.spawn(process.env.SHELL ?? 'bash', [], opts);
+  }
   try {
     return pty.spawn('claude', [], opts);
   } catch (err) {

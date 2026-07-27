@@ -3,6 +3,8 @@
  *
  * Props contract (do not reach into internals):
  *   identity      — current user's userId
+ *   sessionToken  — signed token from join:ok; the server derives identity
+ *                   from this and refuses voice rooms you aren't allowed in
  *   voiceRoom     — "lounge" | `room-${roomId}`
  *   serverHttpUrl — Express base, e.g. http://localhost:3001
  *
@@ -24,6 +26,7 @@ import '@livekit/components-styles';
 
 export interface VoiceControlsProps {
   identity: string;
+  sessionToken: string | null;
   voiceRoom: string;
   serverHttpUrl: string;
 }
@@ -32,13 +35,13 @@ type TokenPayload = { token: string; url: string };
 
 async function fetchVoiceToken(
   serverHttpUrl: string,
-  identity: string,
+  sessionToken: string,
   room: string,
 ): Promise<TokenPayload> {
   const res = await fetch(`${serverHttpUrl.replace(/\/$/, '')}/voice/token`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ identity, room }),
+    body: JSON.stringify({ token: sessionToken, room }),
   });
   if (!res.ok) {
     const body = await res.text();
@@ -95,7 +98,7 @@ function VoiceSession({
   );
 }
 
-export function VoiceControls({ identity, voiceRoom, serverHttpUrl }: VoiceControlsProps) {
+export function VoiceControls({ identity, sessionToken, voiceRoom, serverHttpUrl }: VoiceControlsProps) {
   const [creds, setCreds] = useState<TokenPayload | null>(null);
   const [error, setError] = useState<string | null>(null);
 
@@ -104,7 +107,12 @@ export function VoiceControls({ identity, voiceRoom, serverHttpUrl }: VoiceContr
     setCreds(null);
     setError(null);
 
-    fetchVoiceToken(serverHttpUrl, identity, voiceRoom)
+    if (!sessionToken) {
+      setError('waiting for session');
+      return;
+    }
+
+    fetchVoiceToken(serverHttpUrl, sessionToken, voiceRoom)
       .then((payload) => {
         if (!cancelled) setCreds(payload);
       })
@@ -117,7 +125,7 @@ export function VoiceControls({ identity, voiceRoom, serverHttpUrl }: VoiceContr
     return () => {
       cancelled = true;
     };
-  }, [identity, voiceRoom, serverHttpUrl]);
+  }, [identity, sessionToken, voiceRoom, serverHttpUrl]);
 
   if (error) {
     return <div className="voice-controls voice-controls--error">Voice: {error}</div>;

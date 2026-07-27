@@ -7,12 +7,18 @@ import type { TerminalClientToServer, TerminalServerToClient } from '@hackerhous
 
 interface TerminalProps {
   roomId: string;
+  /**
+   * Signed session token from `join:ok`. Owner write access is gated on this
+   * server-side — a claimed userId is not enough, since presence broadcasts
+   * everyone's userId. Visitors can pass null and still get the read-only feed.
+   */
+  token: string | null;
   mode: 'owner' | 'visitor';
   userId: string;
   serverUrl: string; // e.g. http://localhost:3001
 }
 
-export function Terminal({ roomId, mode, userId, serverUrl }: TerminalProps) {
+export function Terminal({ roomId, mode, userId, token, serverUrl }: TerminalProps) {
   const containerRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -23,7 +29,7 @@ export function Terminal({ roomId, mode, userId, serverUrl }: TerminalProps) {
 
     const socket: Socket<TerminalServerToClient, TerminalClientToServer> = io(
       `${serverUrl}/terminal`,
-      { auth: { userId } }
+      { auth: { userId, token } }
     );
 
     socket.on('connect', () => {
@@ -64,7 +70,7 @@ export function Terminal({ roomId, mode, userId, serverUrl }: TerminalProps) {
       socket.disconnect();
       term.dispose();
     };
-  }, [roomId, mode, userId, serverUrl]);
+  }, [roomId, mode, userId, token, serverUrl]);
 
   return <div ref={containerRef} style={{ width: '100%', height: '100%' }} />;
 }

@@ -171,6 +171,7 @@ export function Room({
         <div className={`hud hud-topright${expanded ? ' hud-hidden' : ''}`}>
           <VoiceControls
             identity={selfId}
+            sessionToken={sessionToken}
             voiceRoom={`room-${roomId}`}
             serverHttpUrl={httpBase}
           />
@@ -196,6 +197,7 @@ export function Room({
               roomId={roomId}
               mode={isOwner ? 'owner' : 'visitor'}
               userId={selfId}
+              token={sessionToken}
               serverUrl={httpBase}
             />
           )

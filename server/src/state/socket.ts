@@ -163,6 +163,11 @@ export function getUserState(userId: string): User | undefined {
   return users.get(userId);
 }
 
+/** Room lookup, so /voice/token can authorize a requested voice room. */
+export function getRoomState(roomId: string): RoomState | undefined {
+  return rooms.get(roomId);
+}
+
 /** For Builder D's /notify handler — emits agent:done on the main namespace. */
 export function emitAgentDone(payload: { userId: string; roomId: string }): void {
   ioRef?.emit('agent:done', payload);

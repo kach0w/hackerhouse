@@ -6,7 +6,8 @@
   "scripts": {
     "dev": "tsx watch src/index.ts",
     "verify": "PORT=3999 DISCONNECT_GRACE_MS=400 tsx src/state/verify.ts",
-    "verify:terminal": "PORT=3998 tsx src/terminal/verify.ts",
+    "verify:terminal": "PORT=3998 HACKERHOUSE_FORCE_SHELL=1 tsx src/terminal/verify.ts",
+    "verify:security": "PORT=3997 HACKERHOUSE_FORCE_SHELL=1 tsx src/security/verify.ts",
     "agent": "tsx src/terminal/agent.ts"
   },
   "dependencies": {

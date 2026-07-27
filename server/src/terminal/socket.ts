@@ -11,14 +11,20 @@ type TSocket = Socket<TerminalClientToServer, TerminalServerToClient>;
 const BUFFER_CAP = 10_000;
 
 /**
- * Ownership check: the room owner is whoever connects with
- * `auth.userId === roomId` (the same userId they used to `join` on the main
- * namespace — roomId === ownerId by convention across the app). We never
- * trust the client's claimed `role`, only this handshake value.
+ * Ownership check. Write access to a room's PTY is a shell on the host, so it
+ * is gated on a *signed* session token — never on a claimed userId.
+ *
+ * This used to compare `handshake.auth.userId` to the roomId. That was
+ * trivially forgeable: `presence:update` broadcasts every user's userId to
+ * everyone, so any visitor could read a victim's id straight off the wire,
+ * reconnect claiming it, and get arbitrary command execution on the machine
+ * hosting the server. The token is unforgeable without SESSION_SECRET.
  */
 function isOwnerOf(socket: Socket, roomId: string): boolean {
-  const userId = socket.handshake.auth?.userId as string | undefined;
-  return !!userId && userId === roomId;
+  const token = socket.handshake.auth?.token as string | undefined;
+  if (!token) return false;
+  const verified = verifySession(token);
+  return !!verified && verified.userId === roomId;
 }
 
 export function registerTerminalNamespace(io: Server) {

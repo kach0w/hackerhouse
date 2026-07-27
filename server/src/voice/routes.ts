@@ -10,15 +10,60 @@ import { AccessToken } from 'livekit-server-sdk';
  *   lounge           -> "lounge"
  *   personal room    -> "room-" + ownerUserId
  */
-export function createVoiceRouter(): Router {
+export interface VoiceDeps {
+  /** From `server/src/state/socket.ts` — proves a claimed identity. */
+  verifySession: (token: string) => { userId: string } | null;
+  /** From `server/src/state/socket.ts` — used to honour a room's lock. */
+  getRoomState: (roomId: string) => { ownerId: string; locked: boolean } | undefined;
+}
+
+/**
+ * Which voice rooms a given user may join.
+ *
+ * Without this the endpoint minted a publish-capable token for ANY room name
+ * you asked for, so locking your room did nothing to its voice channel —
+ * someone refused entry at the door could still sit in the call and talk.
+ */
+function mayJoin(
+  userId: string,
+  room: string,
+  getRoomState: VoiceDeps['getRoomState'],
+): boolean {
+  if (room === 'lounge') return true;
+
+  const ownerId = room.startsWith('room-') ? room.slice('room-'.length) : null;
+  if (!ownerId) return false; // unknown room shape — deny by default
+
+  if (ownerId === userId) return true; // your own room, locked or not
+
+  const state = getRoomState(ownerId);
+  if (!state) return false;
+  return !state.locked;
+}
+
+export function createVoiceRouter(deps: VoiceDeps): Router {
   const router = Router();
 
   router.post('/voice/token', async (req: Request, res: Response) => {
-    const identity = typeof req.body?.identity === 'string' ? req.body.identity.trim() : '';
     const room = typeof req.body?.room === 'string' ? req.body.room.trim() : '';
+    const sessionToken = typeof req.body?.token === 'string' ? req.body.token.trim() : '';
 
-    if (!identity || !room) {
-      res.status(400).json({ error: 'identity and room are required' });
+    if (!room) {
+      res.status(400).json({ error: 'room is required' });
+      return;
+    }
+
+    // Identity comes from the signed token, never from the request body —
+    // otherwise anyone could join voice as anyone else.
+    const verified = sessionToken ? deps.verifySession(sessionToken) : null;
+    if (!verified) {
+      res.status(401).json({ error: 'a valid session token is required' });
+      return;
+    }
+    const identity = verified.userId;
+
+    if (!mayJoin(identity, room, deps.getRoomState)) {
+      res.status(403).json({ error: 'not allowed in that voice room' });
       return;
     }
 

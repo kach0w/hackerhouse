@@ -44,6 +44,7 @@ function House() {
     skipTrack,
     users,
     rooms,
+    sessionToken,
   } = useSocket();
 
   usePushNotifications({ selfId, agentDone, rooms, users });
@@ -187,7 +188,12 @@ function House() {
       */}
       {view === 'lounge' && !usingMock && (
         <div className="hud hud-topright">
-          <VoiceControls identity={selfId} voiceRoom="lounge" serverHttpUrl={httpBase} />
+          <VoiceControls
+            identity={selfId}
+            sessionToken={sessionToken}
+            voiceRoom="lounge"
+            serverHttpUrl={httpBase}
+          />
         </div>
       )}
 

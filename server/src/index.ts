@@ -4,7 +4,13 @@ import express from 'express';
 import http from 'http';
 import { Server } from 'socket.io';
 import type { ClientToServerEvents, ServerToClientEvents } from '@hackerhouse/shared';
-import { registerPresenceHandlers, getUserState, emitAgentDone } from './state/socket.js';
+import {
+  registerPresenceHandlers,
+  getUserState,
+  getRoomState,
+  emitAgentDone,
+  verifySession,
+} from './state/socket.js';
 import { createVoiceRouter } from './voice/routes.js';
 import { createNotifyRouter } from './notify/routes.js';
 import { registerTerminalNamespace } from './terminal/socket.js';
@@ -30,8 +36,8 @@ const io = new Server<ClientToServerEvents, ServerToClientEvents>(httpServer, {
 
 registerPresenceHandlers(io);
 
-app.use(createVoiceRouter());
-app.use(createNotifyRouter({ getUserState, emitAgentDone }));
+app.use(createVoiceRouter({ verifySession, getRoomState }));
+app.use(createNotifyRouter({ getUserState, emitAgentDone, verifySession }));
 app.use(createAgentRouter());
 
 registerTerminalNamespace(io);

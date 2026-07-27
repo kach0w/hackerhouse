@@ -14,6 +14,8 @@ export interface NotifyDeps {
    * Broadcast is fine; Builder B filters on payload.userId === self.
    */
   emitAgentDone: EmitAgentDone;
+  /** From `server/src/state/socket.ts` — authenticates the calling hook. */
+  verifySession: (token: string) => { userId: string } | null;
 }
 
 /**
@@ -27,11 +29,16 @@ export function createNotifyRouter(deps: NotifyDeps): Router {
   const router = Router();
 
   router.post('/notify', (req: Request, res: Response) => {
-    const userId = typeof req.body?.userId === 'string' ? req.body.userId.trim() : '';
-    if (!userId) {
-      res.status(400).json({ error: 'userId is required' });
+    // Identity comes from the signed token the PTY was spawned with, not from
+    // the body — otherwise anyone who can reach the server can forge "user X's
+    // agent finished" for any X.
+    const token = typeof req.body?.token === 'string' ? req.body.token.trim() : '';
+    const verified = token ? deps.verifySession(token) : null;
+    if (!verified) {
+      res.status(401).json({ error: 'a valid session token is required' });
       return;
     }
+    const userId = verified.userId;
 
     const user = deps.getUserState(userId);
     if (!user) {
